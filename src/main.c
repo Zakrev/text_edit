@@ -1,7 +1,8 @@
 #include "../headers/main.h"
 
-int main()
+int main(int args, char ** arg)
 {
+	
 
-	return 0;
+	return SUCCES;
 }

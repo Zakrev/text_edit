@@ -4,4 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define SUCCES 0
+#define ERROR 1
+
+int parse_args(int args, char ** arg);
+
 #endif
