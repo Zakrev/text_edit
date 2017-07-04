@@ -3,20 +3,6 @@
 
 #include "file.h"
 
-#define ListItem struct main_editor_listItem
-ListItem {
-	ListItem * next;
-	ListItem * prev;
-};
-
-#define Line struct main_editor_line
-Line {
-	Line * next;
-	Line * prev;
-	
-	unsigned long id;
-};
-
 #define File struct main_editor_file
 File {
 	File * next;
