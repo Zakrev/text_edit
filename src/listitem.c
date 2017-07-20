@@ -2,8 +2,8 @@
 
 int push_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item)
 {
-	if(item == NULL || items_start == NULL || items_end == NULL || *items_end == NULL){
-		PERR("NULL pointer!");
+	if(item == NULL || items_start == NULL || items_end == NULL){
+		PERR("NULL pointer: %p %p %p", item, items_start, items_end);
 		return -1;
 	}
 		
@@ -14,7 +14,11 @@ int push_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * ite
 		*items_end = item;
 		return 0;
 	}
-	*items_end->next = item;
+	if(*items_end == NULL){
+		PERR("NULL pointer");
+		return 0;
+	}
+	(*items_end)->next = item;
 	item->prev = *items_end;
 	*items_end = item;
 	
@@ -24,14 +28,14 @@ int push_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * ite
 ListItem * erase_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item)
 {
 	if(items_start == NULL || items_end == NULL){
-		PERR("NULL pointer!");
+		PERR("NULL pointer: %p %p", items_start, items_end);
 		return item;
 	}
 	
 	if(*items_end == NULL && *items_end == NULL)
 		return item;
 	if(*items_end == NULL){
-		PERR("NULL pointer!");
+		PERR("NULL pointer");
 		return item;
 	}
 	if(item == NULL){

@@ -1,8 +1,17 @@
 #include "../headers/main.h"
 
-int main(int args, char ** arg)
+/*
+static int parse_args(int args, char ** arg)
 {
 	
+	
+	return 0;
+}
+*/
 
-	return SUCCES;
+int main(int args, char ** arg)
+{
+	FileText * ftext = FileText_open_file(arg[1]);
+
+	return 0;
 }
