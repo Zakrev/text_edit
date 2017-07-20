@@ -10,12 +10,13 @@ struct main_editor_listItem {
 };
 
 #define foreach_in_list(item, start) \
-        for(T * item = start; item != NULL; item = item->next)
+        for(item = start; item != NULL; item = item->next)
         
 #define foreach_in_list_reverse(item, start) \
-        for(T * item = list; item != NULL; item = item->prev)
+        for(item = start; item != NULL; item = item->prev)
 
 int push_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item);
 ListItem * erase_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item);
+int push_ListItem_middle(ListItem * pos, ListItem * item);
 
 #endif

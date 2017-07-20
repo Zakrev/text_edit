@@ -79,44 +79,123 @@ static Line * read_line(int fd, const char * line_end, size_t line_end_len)
                 return NULL;
 }
 
-static int create_lines_groups(FileText * ftext)
+static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned long lines_old_count)
 {
         /*
-                Логически разбивает/переразбивает строки по группам
+                Логически разбивает строки по группам
+                Разбиение начинается с строки idx
+                lines_old_count - старое количество строк
                 В случае успеха возвращает 0
         */
         PRINT("\tCreate groups lines (size/count): ");
-        ftext->group_size = 50;
+        if(lines_old_count == ftext->lines_count){
+                PRINT("lines count equal\n");
+                return 0;
+        }
+        unsigned long group_old_size = ftext->group_size;
+        unsigned long group_old_count = ftext->groups_count;
+        
+        ftext->group_size = MIN_GROUP_SIZE;
         while((ftext->lines_count / ftext->group_size) > MAX_GROUP_COUNT)
                 ftext->group_size *= 10;
-        ftext->groups_count = ftext->lines_count / ftext->group_size;
-        if(ftext->groups_count == 0)
-                ftext->groups_count = 1;
-        if(ftext->lines_group != NULL){
-                ftext->lines_group = realloc(ftext->lines_group, sizeof(Line *) * ftext->groups_count);
-                if(ftext->lines_group == NULL){
-                        PCERR("group = realloc");
-                        return -1;
+        ftext->groups_count = (ftext->lines_count - 1) / ftext->group_size;
+        ftext->groups_count += 1;
+        if(ftext->group_size != group_old_size || ftext->groups_count != group_old_count){
+                if(ftext->lines_group != NULL){
+                        ftext->lines_group = realloc(ftext->lines_group, sizeof(Line *) * ftext->groups_count);
+                        if(ftext->lines_group == NULL){
+                                PCERR("group = realloc");
+                                return -1;
+                        }
+                        if(ftext->group_size != group_old_size){
+                                bzero(ftext->lines_group, ftext->groups_count);
+                                group_old_count = ftext->groups_count;
+                        } else if(ftext->groups_count > group_old_count){
+                                bzero(ftext->lines_group + group_old_count, ftext->groups_count - group_old_count);
+                        }
+                } else {
+                        ftext->lines_group = malloc(sizeof(Line *) * ftext->groups_count);
+                        if(ftext->lines_group == NULL){
+                                PCERR("group = malloc");
+                                return -1;
+                        }
+                        bzero(ftext->lines_group, ftext->groups_count);
                 }
+        }
+        unsigned long gr_idx;
+        Line * line = NULL;
+        if(idx > 1){
+                gr_idx = idx / ftext->group_size;
+                if( (gr_idx * ftext->group_size) < idx)
+                                gr_idx += 1;
         } else {
-                ftext->lines_group = malloc(sizeof(Line *) * ftext->groups_count);
-                if(ftext->lines_group == NULL){
-                        PCERR("group = malloc");
-                        return -1;
+                gr_idx = 0;
+        }
+        if(ftext->lines_count > lines_old_count){
+                for(; gr_idx < ftext->groups_count; gr_idx++){
+                        /*Обновляем ссылки на строки*/
+                        if(ftext->lines_group[gr_idx] == 0)
+                                break;
+                        unsigned long diff = ftext->lines_count - lines_old_count;
+                        foreach_in_list(line, (Line *)ftext->lines_group[gr_idx]){
+                                if(diff == 0)
+                                        break;
+                                diff -= 1;
+                        }
+                        if(line == NULL){
+                                PERR("line is NULL");
+                                return -1;
+                        }
+                        ftext->lines_group[gr_idx] = (ListItem *)line;
+                }
+        } else if(ftext->lines_count < lines_old_count){
+                for(; gr_idx < ftext->groups_count; gr_idx++){
+                        /*Обновляем ссылки на строки*/
+                        if(ftext->lines_group[gr_idx] == 0)
+                                break;
+                        unsigned long diff = lines_old_count - ftext->lines_count;
+                        foreach_in_list_reverse(line, (Line *)ftext->lines_group[gr_idx]){
+                                if(diff == 0)
+                                        break;
+                                diff -= 1;
+                        }
+                        if(line == NULL){
+                                PERR("line is NULL");
+                                return -1;
+                        }
+                        ftext->lines_group[gr_idx] = (ListItem *)line;
                 }
         }
-        ftext->lines_group[0] = ftext->lines;
-        Line * line = (Line *)ftext->lines->next;
-        unsigned int i = 1, j = 1;
-        while(line != NULL){
-                i += 1;
-                if(i == (ftext->group_size + 1)){
-                        ftext->lines_group[j] = (ListItem *)line;
-                        j += 1;
-                        i = 1;
-                }
-                line = line->next;
+#ifdef USE_PTHREADS
+        pthreads!
+#else
+        Line * start;
+        unsigned long ln_idx;
+        unsigned long ln_idx_cur;
+        if(line != NULL){
+                start = line;
+        } else {
+                start = (Line *)ftext->lines;
         }
+        ln_idx = gr_idx * ftext->group_size;
+        if(ln_idx == 0){
+                ftext->lines_group[gr_idx] = (ListItem *)start;
+                ln_idx = 1;
+                gr_idx = 1;
+                start = start->next;
+        }
+        ln_idx_cur = gr_idx * ftext->group_size;
+        foreach_in_list(line, start){
+                if(gr_idx >= ftext->groups_count)
+                        break;
+                if(ln_idx == ln_idx_cur){
+                        ftext->lines_group[gr_idx] = (ListItem *)line;
+                        gr_idx += 1;
+                        ln_idx_cur = gr_idx * ftext->group_size;
+                }
+                ln_idx += 1;
+        }
+#endif
         PRINT("%lu / %lu\n", ftext->group_size, ftext->groups_count);
         return 0;
 }
@@ -158,7 +237,7 @@ static int read_lines(FileText * ftext, const char * line_end, size_t line_end_l
                 PERR("Size of file not equal readed size: %s", ftext->path);
                 return -1;
         }
-        return create_lines_groups(ftext);
+        return create_lines_groups(ftext, 0, 0);
 }
 
 static void free_groups(FileText * ftext)
@@ -242,21 +321,108 @@ FileText * FileText_open_file(const char * path)
         }
         PRINT("\tlines: %lu\n", ftext->lines_count);
         
-        Line * line;
+        unsigned long gridx;
         unsigned long lnum = 1;
-        line = (Line *)ftext->lines;
-        while(line != NULL){
-                printf("%lu: ", lnum);
-                int i;
-                for(i = 0; i < line->len; i++)
-                        printf("%c", line->data[i]);
-                printf("\n");
-                lnum += 1;
-                line = (Line *)line->next;
+        unsigned long grsize;
+        Line * line, * line_2;
+        for(gridx = 0; gridx < ftext->groups_count; gridx++){
+                printf("group: %ld\n", gridx);
+                grsize = ftext->group_size;
+                foreach_in_list(line, (Line *)ftext->lines_group[gridx]){
+                        printf("%lu: ", lnum);
+                        int i;
+                        for(i = 0; i < line->len; i++)
+                                printf("%c", line->data[i]);
+                        /*line_2 = get_Line(ftext, lnum);
+                        if(line_2 != NULL){
+                                for(i = 0; i < line_2->len; i++)
+                                        printf("%c", line_2->data[i]);
+                        }*/
+                        //printf("\n");
+                        lnum += 1;
+                        if(--grsize == 0 && (gridx + 1) != ftext->groups_count)
+                                break;
+                }
         }
         
         return ftext;
         free_return:
                free(ftext);
                return NULL;
+}
+
+Line * get_Line(FileText * ftext, unsigned long idx)
+{
+        /*
+                Возвращает указатель на линию idx
+                Либо NULL
+        */
+        PRINT("get Line: %ld\n", idx);
+        Line * line = NULL;
+        unsigned long gr_idx;
+        unsigned long tmp;
+        
+        gr_idx = idx / ftext->group_size;
+        if( (gr_idx * ftext->group_size) < idx){
+                if(ftext->groups_count > (gr_idx + 1))
+                        gr_idx += 1;
+        }
+        tmp = (gr_idx * ftext->group_size) - (ftext->group_size / 2);
+        if( tmp >= idx ){
+                /*От начала группы*/
+                tmp = ftext->group_size * (gr_idx - 1) + 1;
+                foreach_in_list(line, (Line *)ftext->lines_group[gr_idx - 1]){
+                        if(tmp == idx)
+                                return line;
+                        tmp += 1;
+                }
+        } else {
+                /*От конца группы*/
+                Line * start;
+                if((gr_idx + 1) >= ftext->groups_count){
+                        /*Если это последняя группа*/
+                        start = (Line *)ftext->lines_end;
+                        tmp = ftext->lines_count;
+                } else {
+                        if(ftext->lines_group[gr_idx] == NULL){
+                                PERR("gr_idx is NULL: %ld", gr_idx);
+                                return NULL;
+                        }
+                        start = (Line *)ftext->lines_group[gr_idx]->prev;
+                        tmp = ftext->group_size * gr_idx;
+                }
+                foreach_in_list_reverse(line, start){
+                        if(tmp == idx)
+                                return line;
+                        tmp -= 1;
+                }
+        }
+        if(line == NULL){
+                PERR("fault: %ld / %ld", tmp, idx);
+        }
+        
+        return NULL;
+}
+
+int insert_Line(FileText * ftext, unsigned long idx, Line * line)
+{
+        /*
+                Вставляет линию line в позицию idx
+                Сдвигает линию в idx ниже (т.е. в idx+1)
+                В случае успеха возвращает 0
+        */
+        
+        return 0;
+}
+
+int cut_Line(FileText * ftext, FilePos * pos)
+{
+        /*
+                Разрезает линию в позиции pos
+                После разрезания текущей линии остается левая часть данных,
+                создается новая линия послей текущей, с "правыми" данными текущей
+                В случае успеха возвращает 0
+        */
+        
+        return 0;
 }

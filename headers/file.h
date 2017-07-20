@@ -12,6 +12,9 @@
 #define MAX_FILE_PATCH 255
 #define MIN_LINE_ALLOC_LENGHT 10
 #define MAX_GROUP_COUNT 200
+#define MIN_GROUP_SIZE 50
+
+//#define USE_PTHREADS
 
 typedef struct main_editor_line Line;
 struct main_editor_line {
@@ -20,6 +23,12 @@ struct main_editor_line {
 	
 	size_t len;
 	char * data;
+};
+
+typedef struct main_editor_file_position FilePos;
+struct main_editor_file_position {
+        ssize_t ch_idx;
+        unsigned long ln_idx;
 };
 
 typedef struct main_editor_file_text FileText;
@@ -34,9 +43,12 @@ struct main_editor_file_text {
 	unsigned long group_size;		//Размер группы
 	size_t size;				//Размер файла
 	size_t esize;				//Размер файла, во время редактирования
-	struct stat fstat;
+	FilePos pos;                           //Позиция указателя в файле
+	
+	struct stat fstat;                     //Информация о файле
 };
 
 FileText * FileText_open_file(const char * path);
+Line * get_Line(FileText * ftext, unsigned long idx);
 
 #endif
