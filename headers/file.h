@@ -35,6 +35,7 @@ struct main_editor_line {
 
 typedef struct main_editor_file_position FilePos;
 struct main_editor_file_position {
+        Line * line;
         ssize_t ch_idx;
         unsigned long ln_idx;
 };
@@ -43,6 +44,10 @@ struct main_editor_file_position {
         В файле хранятся две пустые строки (объекты Line: lines и lines_end).
         Они не удаляются и не создаются.
         Нужны только для хранения других строк.
+        
+        В циклах лучше проверять:
+        if(line->type != main_editor_line_type_LINE)
+                        continue;
 */
 
 typedef struct main_editor_file_text FileText;
@@ -64,6 +69,34 @@ struct main_editor_file_text {
 
 int FileText_init(FileText * ftext);
 FileText * FileText_open_file(const char * path);
+
+/*
+        Возвращает указатель на линию idx
+        Либо NULL
+*/
 Line * get_Line(FileText * ftext, unsigned long idx);
+
+/*
+        Вставляет группу линий line в позицию pos
+        Линии сдвинут pos вниз
+        Например:
+        вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+        получится       L1-l1-l2-l3-L2-L3-L4
+        В случае успеха возвращает 0
+*/
+int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line);
+int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line);
+
+/*
+        Вставляет группу линий line в позицию pos
+        Линии встанут за pos
+        Например:
+        вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+        получится       L1-L2-l1-l2-l3-L3-L4
+        В случае успеха возвращает 0
+*/
+int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
+int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line);
+
 
 #endif

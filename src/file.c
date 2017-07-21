@@ -390,6 +390,8 @@ Line * get_Line(FileText * ftext, unsigned long idx)
         unsigned long gr_idx;
         unsigned long tmp;
         
+        if(idx > ftext->lines_count)
+                return NULL;
         if(idx == 0)
                 idx = 1;
         gr_idx = idx / ftext->group_size;
@@ -402,6 +404,8 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                 /*От начала группы*/
                 tmp = ftext->group_size * (gr_idx - 1) + 1;
                 foreach_in_list(line, ftext->lines_group[gr_idx - 1]){
+                        if(line->type != main_editor_line_type_LINE)
+                                continue;
                         if(tmp == idx)
                                 return line;
                         tmp += 1;
@@ -411,7 +415,7 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                 Line * start;
                 if((gr_idx + 1) >= ftext->groups_count){
                         /*Если это последняя группа*/
-                        start = &ftext->lines_end;
+                        start = &ftext->lines_end.prev;
                         tmp = ftext->lines_count;
                 } else {
                         if(ftext->lines_group[gr_idx] == NULL){
@@ -422,6 +426,8 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                         tmp = ftext->group_size * gr_idx;
                 }
                 foreach_in_list_reverse(line, start){
+                        if(line->type != main_editor_line_type_LINE)
+                                continue;
                         if(tmp == idx)
                                 return line;
                         tmp -= 1;
@@ -434,11 +440,113 @@ Line * get_Line(FileText * ftext, unsigned long idx)
         return NULL;
 }
 
-int insert_Line_idx(FileText * ftext, unsigned long idx, Line * line)
+int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line)
 {
         /*
-                Вставляет линию line в позицию idx
-                Сдвигает линию idx ниже (т.е. в idx+1)
+                Вставляет группу линий line в позицию pos
+                Линии сдвинут pos вниз
+                Например:
+                вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+                получится       L1-l1-l2-l3-L2-L3-L4
+                В случае успеха возвращает 0
+        */
+        PFUNC();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(pos == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        Line * fe_line, * tmp_line;
+        unsigned long lines_old_count = ftext->lines_count;
+
+        tmp_line = NULL;
+        foreach_in_list(fe_line, line){
+                if(tmp_line != NULL){
+                        if(0 != insert_ListItem_offset_down((ListItem *)pos, (ListItem *)tmp_line)){
+                                PERR("fault insert item: %lu", ftext->lines_count);
+                                return -1;
+                        }
+                        ftext->lines_count += 1;
+                }
+                tmp_line = fe_line;
+        }
+        if(tmp_line != NULL){
+                /*Последний item*/
+                if(0 != insert_ListItem_offset_down((ListItem *)pos, (ListItem *)tmp_line)){
+                        PERR("fault insert item: %lu", ftext->lines_count);
+                        return -1;
+                }
+                ftext->lines_count += 1;
+        }
+        
+        return create_lines_groups(ftext, idx, lines_old_count);
+}
+
+int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
+{
+        /*
+                Вставляет группу линий line в позицию pos
+                Линии встанут за pos
+                Например:
+                вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+                получится       L1-L2-l1-l2-l3-L3-L4
+                В случае успеха возвращает 0
+        */
+        PFUNC();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(pos == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        Line * fe_line, * tmp_line;
+        unsigned long lines_old_count = ftext->lines_count;
+        
+        tmp_line = NULL;
+        foreach_in_list(fe_line, line){
+                if(tmp_line != NULL){
+                        if(0 != insert_ListItem_offset_up((ListItem *)pos, (ListItem *)tmp_line)){
+                                PERR("fault insert item: %lu", ftext->lines_count);
+                                return -1;
+                        }
+                        pos = tmp_line;
+                        ftext->lines_count += 1;
+                }
+                tmp_line = fe_line;
+        }
+        if(tmp_line != NULL){
+                /*Последний item*/
+                if(0 != insert_ListItem_offset_up((ListItem *)pos, (ListItem *)tmp_line)){
+                        PERR("fault insert item: %lu", ftext->lines_count);
+                        return -1;
+                }
+                ftext->lines_count += 1;
+        }
+        
+        return create_lines_groups(ftext, idx, lines_old_count);
+}
+
+int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line)
+{
+        /*
+                Вставляет группу линий line в позицию idx
+                Линии сдвинут idx вниз
+                Например:
+                вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+                получится       L1-l1-l2-l3-L2-L3-L4
                 В случае успеха возвращает 0
         */
         PFUNC();
@@ -450,27 +558,42 @@ int insert_Line_idx(FileText * ftext, unsigned long idx, Line * line)
                 PERR("ptr is NULL");
                 return -1;
         }
-        if(idx == ftext->lines_count){
-                /*Вставляем как предпоследнюю строку*/
-                //int push_ListItem_middle(ListItem * pos, ListItem * item);
-                return 0;
+        
+        if(idx == (ftext->lines_count + 1)){
+                /*Вставляем с конца файла*/
+                return insert_Line_obj_down(ftext, &ftext->lines_end, line);
+        } else {
+                return insert_Line_obj_down(ftext, get_Line(ftext, idx), line);
         }
-        if(idx == ftext->lines_count + 1){
-                /*Вставляем как последнюю строку*/
-                return 0;
+        
+        return -1;
+}
+
+int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line)
+{
+        /*
+                Вставляет группу линий line в позицию idx
+                Линии встанут за idx
+                Например:
+                вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
+                получится       L1-L2-l1-l2-l3-L3-L4
+                В случае успеха возвращает 0
+        */
+        PFUNC();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
         }
-        if(idx == 1){
-                /*Вставляем как первую строку*/
-                return 0;
+        if(line == NULL){
+                PERR("ptr is NULL");
+                return -1;
         }
-        if(idx > 1 && idx < ftext->lines_count){
-                /*Вставляем в 'середину'*/
-                Line * l_fnd;
-                l_fnd = get_Line(ftext, idx);
-                if(l_fnd == NULL){
-                        
-                }
-                return 0;
+        
+        if(idx == (ftext->lines_count + 1)){
+                /*Вставляем с конца файла*/
+                return insert_Line_obj_up(ftext, ftext->lines_end.prev, line);
+        } else {
+                return insert_Line_obj_up(ftext, get_Line(ftext, idx), line);
         }
         
         return -1;
@@ -485,5 +608,6 @@ int cut_Line(FileText * ftext, FilePos * pos)
                 В случае успеха возвращает 0
         */
         PFUNC();
+        
         return 0;
 }
