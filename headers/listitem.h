@@ -9,14 +9,30 @@ struct main_editor_listItem {
 	ListItem * prev;
 };
 
-#define foreach_in_list(item, start) \
-        for(item = start; item != NULL; item = item->next)
+#define foreach_in_list(__item__, __start__) \
+        for(__item__ = __start__; __item__ != NULL; __item__ = __item__->next)
         
-#define foreach_in_list_reverse(item, start) \
-        for(item = start; item != NULL; item = item->prev)
+#define foreach_in_list_reverse(__item__, __start__) \
+        for(__item__ = __start__; __item__ != NULL; __item__ = __item__->prev)
 
-int push_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item);
-ListItem * erase_ListItem(ListItem ** items_start, ListItem ** items_end, ListItem * item);
-int push_ListItem_middle(ListItem * pos, ListItem * item);
+/*
+        Вставляет item в позицию pos списка
+        Элемент pos сдвигается "под" item
+        Возвращает 0 в случае успеха
+*/
+int insert_ListItem_offset_down(ListItem * pos, ListItem * item);
+
+/*
+        Вставляет item в позицию pos списка
+        Элемент item сдвигается "под" pos
+        Возвращает 0 в случае успеха
+*/
+int insert_ListItem_offset_up(ListItem * pos, ListItem * item);
+
+/*
+        Удаляет item из списка
+        в котором он находится
+*/
+int erase_ListItem(ListItem * item);
 
 #endif

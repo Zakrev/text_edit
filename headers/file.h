@@ -16,12 +16,20 @@
 
 //#define USE_PTHREADS
 
+enum main_editor_line_type {
+        main_editor_line_type_LINE,
+        main_editor_line_type_LINE_0,
+        main_editor_line_type_LINE_END,
+        main_editor_line_type_unexpected
+};
+
 typedef struct main_editor_line Line;
 struct main_editor_line {
 	Line * next;
 	Line * prev;
 	
-	size_t len;
+	unsigned int type;
+	ssize_t len;
 	char * data;
 };
 
@@ -31,23 +39,30 @@ struct main_editor_file_position {
         unsigned long ln_idx;
 };
 
+/*
+        В файле хранятся две пустые строки (объекты Line: lines и lines_end).
+        Они не удаляются и не создаются.
+        Нужны только для хранения других строк.
+*/
+
 typedef struct main_editor_file_text FileText;
 struct main_editor_file_text {
 	int fd;
 	char path[MAX_FILE_PATCH + 1];
-	ListItem * lines;			//Строки
-	ListItem * lines_end;			//Строки
+	ListItem lines;			        //Строки
+	ListItem lines_end;			//Строки
 	unsigned long lines_count;		//Кол-во строк
 	ListItem ** lines_group;		//Группы строк
 	unsigned long groups_count;		//Кол-во групп
 	unsigned long group_size;		//Размер группы
-	size_t size;				//Размер файла
-	size_t esize;				//Размер файла, во время редактирования
-	FilePos pos;                           //Позиция указателя в файле
+	ssize_t size;				//Размер файла
+	ssize_t esize;				//Размер файла, во время редактирования
+	FilePos pos;                            //Позиция указателя в файле
 	
-	struct stat fstat;                     //Информация о файле
+	struct stat fstat;                      //Информация о файле
 };
 
+int FileText_init(FileText * ftext);
 FileText * FileText_open_file(const char * path);
 Line * get_Line(FileText * ftext, unsigned long idx);
 
