@@ -358,10 +358,13 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                 Либо NULL
         */
         PRINT("get Line: %ld\n", idx);
+        
         Line * line = NULL;
         unsigned long gr_idx;
         unsigned long tmp;
         
+        if(idx == 0)
+                idx = 1;
         gr_idx = idx / ftext->group_size;
         if( (gr_idx * ftext->group_size) < idx){
                 if(ftext->groups_count > (gr_idx + 1))
@@ -404,15 +407,43 @@ Line * get_Line(FileText * ftext, unsigned long idx)
         return NULL;
 }
 
-int insert_Line(FileText * ftext, unsigned long idx, Line * line)
+int insert_Line_idx(FileText * ftext, unsigned long idx, Line * line)
 {
         /*
                 Вставляет линию line в позицию idx
-                Сдвигает линию в idx ниже (т.е. в idx+1)
+                Сдвигает линию idx ниже (т.е. в idx+1)
                 В случае успеха возвращает 0
         */
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(idx == ftext->lines_count){
+                /*Вставляем как предпоследнюю строку*/
+                int push_ListItem_middle(ListItem * pos, ListItem * item);
+        }
+        if(idx == ftext->lines_count + 1){
+                /*Вставляем как последнюю строку*/
+                
+        }
+        if(idx == 1){
+                /*Вставляем как первую строку*/
+                
+        }
+        if(idx > 1 && idx < ftext->lines_count){
+                /*Вставляем в 'середину'*/
+                Line * l_fnd;
+                l_fnd = get_Line(ftext, idx);
+                if(l_fnd == NULL){
+                        
+                }
+        }
         
-        return 0;
+        return -1;
 }
 
 int cut_Line(FileText * ftext, FilePos * pos)
