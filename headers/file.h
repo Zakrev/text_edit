@@ -49,10 +49,10 @@ typedef struct main_editor_file_text FileText;
 struct main_editor_file_text {
 	int fd;
 	char path[MAX_FILE_PATCH + 1];
-	ListItem lines;			        //Строки
-	ListItem lines_end;			//Строки
+	Line lines;			        //Строки
+	Line lines_end;	                        //Строки
 	unsigned long lines_count;		//Кол-во строк
-	ListItem ** lines_group;		//Группы строк
+	Line ** lines_group;                    //Группы строк
 	unsigned long groups_count;		//Кол-во групп
 	unsigned long group_size;		//Размер группы
 	ssize_t size;				//Размер файла
