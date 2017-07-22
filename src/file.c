@@ -1,5 +1,8 @@
 #include "../headers/file.h"
 
+/*
+        STATIC FUNCTIONS
+*/
 static int find_ch(const char * str, size_t len, char ch){
 #if DBG_LVL >= 4
         PFUNC();
@@ -13,11 +16,11 @@ static int find_ch(const char * str, size_t len, char ch){
         return 0;
 }
 
-static Line * read_line(int fd, const char * line_end, size_t line_end_len)
+static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len)
 {
         /*
                Читает строку из файла
-               Конец строки определяется набором символов в line_end
+               Конец строки определяется набором символов в eol_chs
                Возвращает структуру, описывающую строку, либо NULL
         */
 #if DBG_LVL >= 3
@@ -53,7 +56,7 @@ static Line * read_line(int fd, const char * line_end, size_t line_end_len)
                 rc = read(fd, line->data + offset, 1);
                 if(1 == rc){
                         line->len += 1;
-                        if(find_ch(line_end, line_end_len, line->data[offset])){
+                        if(find_ch(eol_chs, eol_chs_len, line->data[offset])){
                                 break;
                         }
                         offset += 1;
@@ -67,6 +70,74 @@ static Line * read_line(int fd, const char * line_end, size_t line_end_len)
         }
         if(line->len == 0){
                 goto free_end;
+        }
+        
+#if DBG_LVL >= 3
+        int dbg_i;
+        for(dbg_i = 0; dbg_i <= line->len; dbg_i++)
+                printf("%c", line->data[dbg_i]);
+        PRINT("\n");
+#endif
+        return line;
+        free_end:
+                if(line != NULL)
+                        free(line->data);
+                free(line);
+                return NULL;
+}
+
+static Line * read_line_str(const char * str, ssize_t str_len, const char * eol_chs, ssize_t eol_chs_len)
+{
+        /*
+               Читает строку из str
+               Конец строки определяется набором символов в eol_chs
+               Возвращает структуру, описывающую строку, либо NULL
+        */
+#if DBG_LVL >= 3
+        PFUNC();
+#endif
+        Line * line;
+        size_t max_len;
+        ssize_t offset = 0;
+        int rc;
+        
+        line = malloc(sizeof(Line));
+        if(line == NULL){
+                PCERR("line = malloc");
+                goto free_end;
+        }
+        line->data = malloc(sizeof(char) * MIN_LINE_ALLOC_LENGHT);
+        if(line->data == NULL){
+                PCERR("data = malloc");
+                goto free_end;
+        }
+        line->type = main_editor_line_type_LINE;
+        line->len = 0;
+        max_len = MIN_LINE_ALLOC_LENGHT;
+        while(1){
+                if(offset >= str_len)
+                        break;
+                if( line->len == max_len ){
+                        max_len += MIN_LINE_ALLOC_LENGHT;
+                        line->data = realloc(line->data, sizeof(char) * max_len);
+                        if(line->data == NULL){
+                                PCERR("realloc %lld", (long long)max_len);
+                                goto free_end;
+                        }
+                }
+                line->data[offset] = str[offset];
+                line->len += 1;
+                if(find_ch(eol_chs, eol_chs_len, line->data[offset])){
+                        break;
+                }
+                offset += 1;
+        }
+        if(line->len == 0){
+#if DBG_LVL >= 3
+                PRINT("new line is emrty\n");
+#endif
+                bzero(line->data, MIN_LINE_ALLOC_LENGHT);
+                return line;
         }
         
 #if DBG_LVL >= 3
@@ -243,7 +314,7 @@ static int read_lines(FileText * ftext, const char * line_end, size_t line_end_l
         ftext->lines_count = 0;
         while(1){
                 /*Чтение строк*/
-                line = read_line(ftext->fd, line_end, line_end_len);
+                line = read_line_fd(ftext->fd, line_end, line_end_len);
                 if(line == NULL)
                         break;
                 if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
@@ -292,6 +363,30 @@ static void free_lines(FileText * ftext)
         }
 }
 
+static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data, ssize_t data_len)
+{
+        /*
+                Функция редактирует строку line
+                start - номер символа, с которого начнется редактирование
+                len - длина заменяемых данных, данные начиная с start (включая этот символ) и заканчивая len-1 будут заменены
+                        при len == 0, данные data будут записаны после символа start
+                data - добавляемые данные
+                        при data == NULL, данные начиная с start (включая этот символ) и заканчивая len-1 будут удалены
+                data_len - размер добавляемых данных
+                        при data_len == 0, данные начиная с start (включая этот символ) и заканчивая len-1 будут удалены
+                Функция не записывает в конец строки символ конца строки, но может удалить
+                
+                В случае успеха возвращает 0
+        */
+        PFUNC();
+        /*TODO*/
+        
+        return 0;
+}
+
+/*
+        GLOBAL FUNCTIONS
+*/
 int FileText_init(FileText * ftext)
 {
         PFUNC();
@@ -304,6 +399,8 @@ int FileText_init(FileText * ftext)
         ftext->lines.next = &ftext->lines_end;
         ftext->lines_end.type = main_editor_line_type_LINE_END;
         ftext->lines_end.prev = &ftext->lines;
+        ftext->eol_chs[0] = "\n";
+        ftext->eol_chs_len = 1;
         
         return 0;
 }
@@ -342,7 +439,7 @@ FileText * FileText_open_file(const char * path)
         } else
                lseek(ftext->fd, 0, SEEK_SET);
         PRINT("\tsize: %lld\n", (long long)ftext->size);
-        if(0 != read_lines(ftext, "\n", 1)){
+        if(0 != read_lines(ftext, ftext->eol_chs, ftext->eol_chs_len)){
                PERR("Read file: %s", path);
                /*
                        TODO: free_lines
@@ -599,15 +696,104 @@ int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line)
         return -1;
 }
 
-int cut_Line(FileText * ftext, FilePos * pos)
+int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
 {
         /*
-                Разрезает линию в позиции pos
+                Разрезает группу линий в позициях pos
+                В структуре pos должны быть заполнены поля:
+                        pos->line
+                        pos->ch_idx
+                        pos->ln_idx (можно 0)
                 После разрезания текущей линии остается левая часть данных,
-                создается новая линия послей текущей, с "правыми" данными текущей
+                создается новая линия послей текущей, с "правыми" данными текущей.
+                ch_new_line     - определяет символ окончания строки, который будет вставлен в конец "левых данных".
+                Символ в позиции ch_idx является началом "правых" данных.
+                Например:
+                разрезать       l2-l3-l6 из l1-l2-l3-l4-l5-l6
+                получится       l1-l2/1-l2/2-l3/1-l3/2-l4-l5-l6/1-l6/2
                 В случае успеха возвращает 0
         */
         PFUNC();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(pos == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        FilePos * fe_pos;
+        Line new_lines_end;
+        Line * new_line = NULL;
+        unsigned long minimal_idx;
         
-        return 0;
+        bzero(&new_lines_end, sizeof(Line));
+        new_lines_end->type = main_editor_line_type_LINE_END;
+        
+        minimal_idx = pos->ln_idx;
+        foreach_in_list(fe_pos, pos){
+                /*Создание новых строк*/
+                if(fe_pos->line == NULL){
+                        PERR("ptr is NULL");
+                        return -1;
+                }
+                if(fe_pos->line->len > 0){
+                        if(fe_pos->ch_idx < 0 || fe_pos->ch_idx >= fe_pos->line->len){
+                                PERR("unexpected ch_idx: %lld", fe_pos->ch_idx);
+                                return -1;
+                        }
+                        new_line = read_line_str(pos->line->data + pos->ch_idx, pos->line->len - pos->ch_idx, ftext->eol_chs, ftext->eol_chs_len);
+                        if(new_line == NULL){
+                                PERR("fault create item");
+                                return -1;
+                        }
+                        if(0 != insert_ListItem_offset_down((ListItem *)&new_lines_end, (ListItem *)new_line)){
+                                PERR("fault insert item");
+                                return -1;
+                        }
+                        /*TODO: вырезать текст из line*/
+                } else {
+                        /*Полностью пустая строка*/
+                        new_line = read_line_str(NULL, 0, NULL, 0);
+                        if(new_line == NULL){
+                                PERR("fault create item");
+                                return -1;
+                        }
+                        if(0 != insert_ListItem_offset_down((ListItem *)&new_lines_end, (ListItem *)new_line)){
+                                PERR("fault insert item");
+                                return -1;
+                        }
+                }
+                if(minimal_idx > fe_pos->ln_idx)
+                        minimal_idx = pos->ln_idx;
+                if(fe_pos->next == NULL)
+                        break;
+        }
+        new_line = new_lines_end.prev;
+        if(new_line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        Line * tmp_line = NULL;
+        unsigned long lines_old_count = ftext->lines_count;
+        foreach_in_list_reverse(fe_pos, fe_pos){
+                /*Добавление строк*/
+                tmp_line = new_line;
+                new_line = new_line->prev;
+                erase_ListItem((ListItem *)tmp_line);
+                if(0 != insert_ListItem_offset_up((ListItem *)fe_pos->line, (ListItem *)tmp_line)){
+                        PERR("fault insert item");
+                        break;
+                }
+                ftext->lines_count += 1;
+        }
+        
+        return create_lines_groups(ftext, minimal_idx, lines_old_count);
 }
+
+/*
+        TODO
+        Функция удаляет len символов начиная с позиции pos
+        Затрагиваются все строки, находящиеся в диапазоне len
+        Или лучше РЕДАКТИРУЕТ?
+*/

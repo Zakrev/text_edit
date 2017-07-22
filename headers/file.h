@@ -13,6 +13,7 @@
 #define MIN_LINE_ALLOC_LENGHT 10
 #define MAX_GROUP_COUNT 200
 #define MIN_GROUP_SIZE 50
+#define MAX_EOL_CHS_LEN 5
 
 //#define USE_PTHREADS
 
@@ -35,6 +36,9 @@ struct main_editor_line {
 
 typedef struct main_editor_file_position FilePos;
 struct main_editor_file_position {
+        FilePos * next;
+        FilePos * prev;
+
         Line * line;
         ssize_t ch_idx;
         unsigned long ln_idx;
@@ -63,6 +67,8 @@ struct main_editor_file_text {
 	ssize_t size;				//Размер файла
 	ssize_t esize;				//Размер файла, во время редактирования
 	FilePos pos;                            //Позиция указателя в файле
+	char eol_chs[MAX_EOL_CHS_LEN];          //Символы конца строки
+	ssize_t eol_chs_len;                    //Количество символов конца строки
 	
 	struct stat fstat;                      //Информация о файле
 };
