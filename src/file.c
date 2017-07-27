@@ -3,7 +3,8 @@
 /*
         STATIC FUNCTIONS
 */
-static int find_ch(const char * str, size_t len, char ch){
+static int find_ch(const char * str, ssize_t len, char ch)
+{
 #if DBG_LVL >= 4
         PFUNC();
 #endif
@@ -101,7 +102,6 @@ static Line * read_line_str(const char * str, ssize_t str_len, const char * eol_
         Line * line;
         size_t max_len;
         ssize_t offset = 0;
-        int rc;
         
         line = malloc(sizeof(Line));
         if(line == NULL){
@@ -225,7 +225,8 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
                         if(ftext->lines_group[gr_idx] == 0)
                                 break;
                         unsigned long diff = ftext->lines_count - lines_old_count;
-                        foreach_in_list(line, ftext->lines_group[gr_idx]){
+                        PRINT("diff: %lu\n", diff);
+                        foreach_in_list_reverse(line, ftext->lines_group[gr_idx]){
                                 if(line->type != main_editor_line_type_LINE)
                                         continue;
                                 if(diff == 0)
@@ -233,7 +234,7 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
                                 diff -= 1;
                         }
                         if(line == NULL){
-                                PERR("line is NULL");
+                                PERR("ptr is NULL");
                                 return -1;
                         }
                         ftext->lines_group[gr_idx] = line;
@@ -322,7 +323,6 @@ static int read_lines(FileText * ftext, const char * line_end, size_t line_end_l
                 if(line == NULL)
                         break;
                 if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
-                        PRINT("%p %p %p\n", line->prev, line, line->next);
                         ftext->lines_count += 1;
                         ftext->esize += line->len;
                 } else
@@ -387,11 +387,11 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                 PERR("ptr is NULL");
                 return -1;
         }
-        if(start < 0 || line->len >= start){
+        if(start < 0 || line->len <= start){
                 PERR("unexpexted 'start': %lld", start);
                 return -1;
         }
-        if(len < 0 || line->len > (start + len)){
+        if(len < 0 || line->len < (start + len)){
                 PERR("unexpexted 'len': %lld", len);
                 return -1;
         }
@@ -423,9 +423,11 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                                 }
                                 line->alloc = sizeof(char) * new_len;
                         }
-                        for(pos = line->len, new_pos = new_len; line->data[pos] != 0 && pos >= start; pos--, new_len--){
+                        for(pos = line->len - 1, new_pos = new_len - 1; line->data[pos] != 0 && pos >= start; pos--, new_pos--){
                                 /*перемещаем старые данные в конец*/
+                                PRINT("%c -> %c\n", line->data[pos], line->data[new_pos]);
                                 line->data[new_pos] = line->data[pos];
+                                
                         }
                         for(pos = 0, new_pos = start; pos < data_len; pos++, new_pos++){
                                 /*перемещаем новые данные*/
@@ -442,8 +444,8 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                         line->data[new_pos] = line->data[pos];
                 }
         }
-        line->len = new_len;
         if(line->alloc > line->len){
+                PRINT("%lld - %lld\n", line->len, new_len);
                 /*Выравниваем выделенную память*/
                 line->data = realloc(line->data, sizeof(char) * line->len);
                 if(line->data == NULL){
@@ -459,8 +461,13 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
 /*
         GLOBAL FUNCTIONS
 */
-int FileText_init(FileText * ftext)
+int FileText_init(FileText * ftext, const char * eol_chs, unsigned char eol_chs_len)
 {
+        /*
+                Инициализирует структуру FileText_init
+                eol_chs  - символы конца строки
+                eol_chs_len - кол-во символов
+        */
         PFUNC();
         if(ftext == NULL){
                 PERR("ptr is NULL");
@@ -471,14 +478,20 @@ int FileText_init(FileText * ftext)
         ftext->lines.next = &ftext->lines_end;
         ftext->lines_end.type = main_editor_line_type_LINE_END;
         ftext->lines_end.prev = &ftext->lines;
-        ftext->eol_chs[0] = "\n";
-        ftext->eol_chs_len = 1;
+        bzero(ftext->eol_chs, MAX_EOL_CHS_LEN);
+        if(eol_chs_len > MAX_EOL_CHS_LEN)
+                eol_chs_len = MAX_EOL_CHS_LEN;
+        memcpy(ftext->eol_chs, eol_chs, eol_chs_len);
+        ftext->eol_chs_len = eol_chs_len;
         
         return 0;
 }
 
 FileText * FileText_open_file(const char * path)
 {
+        /*
+                Открывает файл и представляет его содержимое в структупах
+        */
         PFUNC();
         if(path == NULL)
                 return NULL;
@@ -489,7 +502,7 @@ FileText * FileText_open_file(const char * path)
                PCERR("FileText malloc");
                return NULL;
         }
-        FileText_init(ftext);
+        FileText_init(ftext, "\n", 1);
         PRINT("\n\tpath: %s\n", path);
         if(0 != stat(path, &ftext->fstat)){
                PCERR("Get stat of file: %s", path);
@@ -513,9 +526,6 @@ FileText * FileText_open_file(const char * path)
         PRINT("\tsize: %lld\n", (long long)ftext->size);
         if(0 != read_lines(ftext, ftext->eol_chs, ftext->eol_chs_len)){
                PERR("Read file: %s", path);
-               /*
-                       TODO: free_lines
-               */
                free_lines(ftext);
                free_groups(ftext);
                goto free_return;
@@ -525,8 +535,19 @@ FileText * FileText_open_file(const char * path)
         unsigned long gridx;
         unsigned long lnum = 1;
         unsigned long grsize;
+        unsigned long counte_print_lines = 52;
         Line * line;
-        for(gridx = 0; gridx < ftext->groups_count; gridx++){
+        FilePos cut_pos;
+        
+        if(0 != fill_FilePos(ftext, &cut_pos, 6, 24)){
+                PERR("fault fill FilePos");
+        } else
+                if(0 != cut_Line(ftext, &cut_pos)){
+                        PERR("fault cut line");
+                }
+        line = get_Line(ftext, 1);
+        edit_Line(line, 1, 0, "helo", 4);
+        for(gridx = 0; gridx < ftext->groups_count && counte_print_lines >= lnum; gridx++){
                 printf("group: %ld\n", gridx);
                 grsize = ftext->group_size;
                 foreach_in_list(line, ftext->lines_group[gridx]){
@@ -537,6 +558,8 @@ FileText * FileText_open_file(const char * path)
                         for(i = 0; i < line->len; i++)
                                 printf("%c", line->data[i]);
                         lnum += 1;
+                        if(counte_print_lines < lnum)
+                                break;
                         if(--grsize == 0 && (gridx + 1) != ftext->groups_count)
                                 break;
                 }
@@ -584,7 +607,7 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                 Line * start;
                 if((gr_idx + 1) >= ftext->groups_count){
                         /*Если это последняя группа*/
-                        start = &ftext->lines_end.prev;
+                        start = ftext->lines_end.prev;
                         tmp = ftext->lines_count;
                 } else {
                         if(ftext->lines_group[gr_idx] == NULL){
@@ -633,7 +656,6 @@ int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line)
                 return -1;
         }
         Line * fe_line, * tmp_line;
-        unsigned long lines_old_count = ftext->lines_count;
 
         tmp_line = NULL;
         foreach_in_list(fe_line, line){
@@ -655,7 +677,7 @@ int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line)
                 ftext->lines_count += 1;
         }
         
-        return create_lines_groups(ftext, idx, lines_old_count);
+        return 0;
 }
 
 int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
@@ -682,7 +704,6 @@ int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
                 return -1;
         }
         Line * fe_line, * tmp_line;
-        unsigned long lines_old_count = ftext->lines_count;
         
         tmp_line = NULL;
         foreach_in_list(fe_line, line){
@@ -705,7 +726,7 @@ int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
                 ftext->lines_count += 1;
         }
         
-        return create_lines_groups(ftext, idx, lines_old_count);
+        return 0;
 }
 
 int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line)
@@ -727,12 +748,15 @@ int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line)
                 PERR("ptr is NULL");
                 return -1;
         }
+        unsigned long lines_old_count = ftext->lines_count;
         
         if(idx == (ftext->lines_count + 1)){
                 /*Вставляем с конца файла*/
-                return insert_Line_obj_down(ftext, &ftext->lines_end, line);
+                if(0 == insert_Line_obj_down(ftext, &ftext->lines_end, line))
+                        return create_lines_groups(ftext, idx, lines_old_count);
         } else {
-                return insert_Line_obj_down(ftext, get_Line(ftext, idx), line);
+                if(0 == insert_Line_obj_down(ftext, get_Line(ftext, idx), line))
+                        return create_lines_groups(ftext, idx, lines_old_count);
         }
         
         return -1;
@@ -757,18 +781,21 @@ int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line)
                 PERR("ptr is NULL");
                 return -1;
         }
+        unsigned long lines_old_count = ftext->lines_count;
         
         if(idx == (ftext->lines_count + 1)){
                 /*Вставляем с конца файла*/
-                return insert_Line_obj_up(ftext, ftext->lines_end.prev, line);
+                if(0 == insert_Line_obj_up(ftext, ftext->lines_end.prev, line))
+                        return create_lines_groups(ftext, idx, lines_old_count);
         } else {
-                return insert_Line_obj_up(ftext, get_Line(ftext, idx), line);
+                if(0 == insert_Line_obj_up(ftext, get_Line(ftext, idx), line))
+                        return create_lines_groups(ftext, idx, lines_old_count);
         }
         
         return -1;
 }
 
-int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
+int cut_Line(FileText * ftext, FilePos * pos)
 {
         /*
                 Разрезает группу линий в позициях pos
@@ -778,7 +805,6 @@ int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
                         pos->ln_idx (можно 0)
                 После разрезания текущей линии остается левая часть данных,
                 создается новая линия послей текущей, с "правыми" данными текущей.
-                ch_new_line     - определяет символ окончания строки, который будет вставлен в конец "левых данных".
                 Символ в позиции ch_idx является началом "правых" данных.
                 Например:
                 разрезать       l2-l3-l6 из l1-l2-l3-l4-l5-l6
@@ -800,7 +826,7 @@ int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
         unsigned long minimal_idx;
         
         bzero(&new_lines_end, sizeof(Line));
-        new_lines_end->type = main_editor_line_type_LINE_END;
+        new_lines_end.type = main_editor_line_type_LINE_END;
         
         minimal_idx = pos->ln_idx;
         foreach_in_list(fe_pos, pos){
@@ -823,7 +849,10 @@ int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
                                 PERR("fault insert item");
                                 return -1;
                         }
-                        /*TODO: вырезать текст из line*/
+                        if(0 != edit_Line(fe_pos->line, fe_pos->ch_idx, new_line->len, ftext->eol_chs, ftext->eol_chs_len)){
+                                PERR("fault erase chars");
+                                return -1;
+                        }
                 } else {
                         /*Полностью пустая строка*/
                         new_line = read_line_str(NULL, 0, NULL, 0);
@@ -871,9 +900,36 @@ int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
 */
 
 
-/*
-        TODO
-        Функция заполняет структуру FilePos
-        В случае успеха возвращает 0
-        (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
-*/
+int fill_FilePos(FileText * ftext, FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
+{
+        /*
+                Функция заполняет структуру FilePos
+                В случае успеха возвращает 0
+                (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
+        */
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(pos == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        
+        pos->next = NULL;
+        pos->prev = NULL;
+        
+        pos->line = get_Line(ftext, ln_idx);
+        if(pos->line == NULL){
+                PERR("line not found: %lu", ln_idx);
+                return -1;
+        }
+        pos->ln_idx = ln_idx;
+        if(ch_idx < 0 || ch_idx >= pos->line->len){
+                PERR("unexpected ch_idx: %lld", (long long)ch_idx);
+                return -1;
+        }
+        pos->ch_idx = ch_idx;
+        
+        return 0;
+}

@@ -13,7 +13,7 @@
 #define MIN_LINE_ALLOC_LENGHT 10
 #define MAX_GROUP_COUNT 200
 #define MIN_GROUP_SIZE 50
-#define MAX_EOL_CHS_LEN 5
+#define MAX_EOL_CHS_LEN 1
 
 //#define USE_PTHREADS
 
@@ -30,9 +30,9 @@ struct main_editor_line {
 	Line * prev;
 	
 	unsigned int type;
-	ssize_t len;
-	char * data;
-	ssize_t alloc;
+	ssize_t len;            //длина строки
+	char * data;            //данные строки
+	ssize_t alloc;          //выделено памяти под строку (может быть больше длины)
 };
 
 typedef struct main_editor_file_position FilePos;
@@ -69,12 +69,21 @@ struct main_editor_file_text {
 	ssize_t esize;				//Размер файла, во время редактирования
 	FilePos pos;                            //Позиция указателя в файле
 	char eol_chs[MAX_EOL_CHS_LEN];          //Символы конца строки
-	ssize_t eol_chs_len;                    //Количество символов конца строки
+	unsigned char eol_chs_len;              //Количество символов конца строки
 	
 	struct stat fstat;                      //Информация о файле
 };
 
-int FileText_init(FileText * ftext);
+/*
+        Инициализирует структуру FileText_init
+        eol_chs  - символы конца строки
+        eol_chs_len - кол-во символов
+*/
+int FileText_init(FileText * ftext, const char * eol_chs, unsigned char eol_chs_len);
+
+/*
+        Открывает файл и представляет его содержимое в структупах
+*/
 FileText * FileText_open_file(const char * path);
 
 /*
@@ -90,6 +99,8 @@ Line * get_Line(FileText * ftext, unsigned long idx);
         вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
         получится       L1-l1-l2-l3-L2-L3-L4
         В случае успеха возвращает 0
+        
+        Функцию insert_Line_obj_down использовать совместно с restructere_file_groups
 */
 int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line);
 int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line);
@@ -101,9 +112,32 @@ int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line);
         вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
         получится       L1-L2-l1-l2-l3-L3-L4
         В случае успеха возвращает 0
+        
+        Функцию insert_Line_obj_up использовать совместно с restructere_file_groups
 */
-int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line)
+int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line);
 int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line);
 
+/*
+        Разрезает группу линий в позициях pos
+        В структуре pos должны быть заполнены поля:
+                pos->line
+                pos->ch_idx
+                pos->ln_idx (можно 0)
+        После разрезания текущей линии остается левая часть данных,
+        создается новая линия послей текущей, с "правыми" данными текущей.
+        Символ в позиции ch_idx является началом "правых" данных.
+        Например:
+        разрезать       l2-l3-l6 из l1-l2-l3-l4-l5-l6
+        получится       l1-l2/1-l2/2-l3/1-l3/2-l4-l5-l6/1-l6/2
+        В случае успеха возвращает 0
+*/
+int cut_Line(FileText * ftext, FilePos * pos);
 
+/*
+        Функция заполняет структуру FilePos
+        В случае успеха возвращает 0
+        (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
+*/
+int fill_FilePos(FileText * ftext, FilePos * pos, unsigned long ln_idx, ssize_t ch_idx);
 #endif
