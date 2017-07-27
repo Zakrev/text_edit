@@ -8,11 +8,11 @@ int insert_ListItem_offset_down(ListItem * pos, ListItem * item)
                 Возвращает 0 в случае успеха
         */
         if(pos == NULL){
-                PERR("NULL pointer");
+                PERR("ptr is NULL");
                 return -1;
         }
         if(item == NULL){
-                PERR("NULL pointer");
+                PERR("ptr is NULL");
                 return -1;
         }
         if(pos->prev != NULL){
@@ -33,11 +33,11 @@ int insert_ListItem_offset_up(ListItem * pos, ListItem * item)
                 Возвращает 0 в случае успеха
         */
         if(pos == NULL){
-                PERR("NULL pointer");
+                PERR("ptr is NULL");
                 return -1;
         }
         if(item == NULL){
-                PERR("NULL pointer");
+                PERR("ptr is NULL");
                 return -1;
         }
         if(pos->next != NULL){
@@ -57,7 +57,7 @@ int erase_ListItem(ListItem * item)
                 в котором он находится
         */
         if(item == NULL){
-                PERR("NULL pointer");
+                PERR("ptr is NULL");
                 return -1;
         }
         

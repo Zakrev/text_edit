@@ -1,7 +1,7 @@
 #ifndef _LISTITEM_H_
 #define _LISTITEM_H_
 
-#include "debug_print.h"
+#include "debug.h"
 
 typedef struct main_editor_listItem ListItem;
 struct main_editor_listItem {

@@ -19,10 +19,21 @@
 #if DBG_LVL >= 2
 #define PINF(...) fprintf(stdout, "NOTICE: %s: %d: %s: ", __FILE__, __LINE__, __FUNCTION__); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); fflush(stdout)
 #define PRINT(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
-#define PFUNC() fprintf(stdout, "%s\n", __FUNCTION__); fflush(stdout)
+
+//#include <time.h>
+#include <sys/time.h>
+double __time_exec_wtime__();
+#define PFUNC_START() \
+                fprintf(stdout, "SF: %s\n", __FUNCTION__); fflush(stdout); \
+                double __time_exec_function__ = __time_exec_wtime__()
+                
+#define PFUNC_END() \
+                fprintf(stdout, "SE: %s: %f sec\n", __FUNCTION__, __time_exec_wtime__() - __time_exec_function__); fflush(stdout)
 #else
 #define PINF(...)
 #define PRINT(...)
+#define PFUNC_START()
+#define PFUNC_END()
 #endif
 
 #endif

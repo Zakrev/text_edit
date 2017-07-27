@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
-#include "debug_print.h"
+#include "debug.h"
 #include "listitem.h"
 
 #define MAX_FILE_PATCH 255
@@ -40,9 +40,10 @@ struct main_editor_file_position {
         FilePos * next;
         FilePos * prev;
 
-        Line * line;
-        ssize_t ch_idx;
-        unsigned long ln_idx;
+        Line * line;            //Указатель на строку ln_idx
+        ssize_t ch_idx;         //Позиция первого выделенного символа в строке
+        unsigned long ln_idx;   //Номер строки
+        ssize_t len;            //Количество выделенных символов
 };
 
 /*
@@ -94,16 +95,14 @@ Line * get_Line(FileText * ftext, unsigned long idx);
 
 /*
         Вставляет группу линий line в позицию pos
-        Линии сдвинут pos вниз
+        Линии встанут перед pos
         Например:
         вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
         получится       L1-l1-l2-l3-L2-L3-L4
         В случае успеха возвращает 0
-        
-        Функцию insert_Line_obj_down использовать совместно с restructere_file_groups
+        Изменяется размер файла
 */
-int insert_Line_obj_down(FileText * ftext, Line * pos, Line * line);
-int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line);
+int insert_Line_down(FileText * ftext, FilePos * pos, Line * line);
 
 /*
         Вставляет группу линий line в позицию pos
@@ -112,11 +111,9 @@ int insert_Line_idx_down(FileText * ftext, unsigned long idx, Line * line);
         вставить        l1-l2-l3 в L2 из L1-L2-L3-L4
         получится       L1-L2-l1-l2-l3-L3-L4
         В случае успеха возвращает 0
-        
-        Функцию insert_Line_obj_up использовать совместно с restructere_file_groups
+        Изменяется размер файла
 */
-int insert_Line_obj_up(FileText * ftext, Line * pos, Line * line);
-int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line);
+int insert_Line_up(FileText * ftext, FilePos * pos, Line * line);
 
 /*
         Разрезает группу линий в позициях pos
@@ -131,13 +128,15 @@ int insert_Line_idx_up(FileText * ftext, unsigned long idx, Line * line);
         разрезать       l2-l3-l6 из l1-l2-l3-l4-l5-l6
         получится       l1-l2/1-l2/2-l3/1-l3/2-l4-l5-l6/1-l6/2
         В случае успеха возвращает 0
+        Изменяется размер файла
 */
 int cut_Line(FileText * ftext, FilePos * pos);
 
 /*
         Функция заполняет структуру FilePos
+        Если line == NULL, то ищет строку по ln_idx
         В случае успеха возвращает 0
         (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
 */
-int fill_FilePos(FileText * ftext, FilePos * pos, unsigned long ln_idx, ssize_t ch_idx);
+int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_idx, ssize_t ch_idx);
 #endif
