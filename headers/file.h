@@ -32,6 +32,7 @@ struct main_editor_line {
 	unsigned int type;
 	ssize_t len;
 	char * data;
+	ssize_t alloc;
 };
 
 typedef struct main_editor_file_position FilePos;

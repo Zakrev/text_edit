@@ -41,6 +41,7 @@ static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len)
                 PCERR("data = malloc");
                 goto free_end;
         }
+        line->alloc = sizeof(char) * MIN_LINE_ALLOC_LENGHT;
         line->type = main_editor_line_type_LINE;
         line->len = 0;
         max_len = MIN_LINE_ALLOC_LENGHT;
@@ -52,6 +53,7 @@ static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len)
                                 PCERR("realloc %lld", (long long)max_len);
                                 goto free_end;
                         }
+                        line->alloc = sizeof(char) * max_len;
                 }
                 rc = read(fd, line->data + offset, 1);
                 if(1 == rc){
@@ -111,6 +113,7 @@ static Line * read_line_str(const char * str, ssize_t str_len, const char * eol_
                 PCERR("data = malloc");
                 goto free_end;
         }
+        line->alloc = sizeof(char) * MIN_LINE_ALLOC_LENGHT;
         line->type = main_editor_line_type_LINE;
         line->len = 0;
         max_len = MIN_LINE_ALLOC_LENGHT;
@@ -124,6 +127,7 @@ static Line * read_line_str(const char * str, ssize_t str_len, const char * eol_
                                 PCERR("realloc %lld", (long long)max_len);
                                 goto free_end;
                         }
+                        line->alloc = sizeof(char) * max_len;
                 }
                 line->data[offset] = str[offset];
                 line->len += 1;
@@ -369,7 +373,7 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                 Функция редактирует строку line
                 start - номер символа, с которого начнется редактирование
                 len - длина заменяемых данных, данные начиная с start (включая этот символ) и заканчивая len-1 будут заменены
-                        при len == 0, данные data будут записаны после символа start
+                        при len == 0, данные data будут записаны перед символом start
                 data - добавляемые данные
                         при data == NULL, данные начиная с start (включая этот символ) и заканчивая len-1 будут удалены
                 data_len - размер добавляемых данных
@@ -379,7 +383,75 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                 В случае успеха возвращает 0
         */
         PFUNC();
-        /*TODO*/
+        if(line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(start < 0 || line->len >= start){
+                PERR("unexpexted 'start': %lld", start);
+                return -1;
+        }
+        if(len < 0 || line->len > (start + len)){
+                PERR("unexpexted 'len': %lld", len);
+                return -1;
+        }
+        if(data_len < 0){
+                PERR("unexpexted 'data_len': %lld", len);
+                return -1;
+        }
+        ssize_t new_len = line->len;
+        ssize_t pos, new_pos;
+                
+        if(len > 0){
+                if(line->data != NULL && line->len > 0){
+                        /*Вырезаем символы*/
+                        bzero(line->data + start, len);
+                        new_len = line->len - len;
+                } else {
+                        PINF("line data: %p %lld", line->data, line->len);
+                }
+        }
+        if(data != NULL && data_len > 0){
+                if(line->data != NULL){
+                        /*Вставляем символы*/
+                        new_len += data_len;
+                        if(new_len > line->alloc){
+                                line->data = realloc(line->data, sizeof(char) * new_len);
+                                if(line->data == NULL){
+                                        PCERR("realloc %lld", (long long)new_len);
+                                        return -1;
+                                }
+                                line->alloc = sizeof(char) * new_len;
+                        }
+                        for(pos = line->len, new_pos = new_len; line->data[pos] != 0 && pos >= start; pos--, new_len--){
+                                /*перемещаем старые данные в конец*/
+                                line->data[new_pos] = line->data[pos];
+                        }
+                        for(pos = 0, new_pos = start; pos < data_len; pos++, new_pos++){
+                                /*перемещаем новые данные*/
+                                line->data[new_pos] = data[pos];
+                        }
+                } else {
+                        PINF("line data: %p %lld", line->data, line->len);
+                }
+        }
+        if(data_len < len){
+                /*Убираем "пустоту" в строке*/
+                for(pos = start + len, new_pos = start + data_len; pos < new_len; pos++, new_len++){
+                        /*перемещаем старые данные*/
+                        line->data[new_pos] = line->data[pos];
+                }
+        }
+        line->len = new_len;
+        if(line->alloc > line->len){
+                /*Выравниваем выделенную память*/
+                line->data = realloc(line->data, sizeof(char) * line->len);
+                if(line->data == NULL){
+                        PCERR("realloc %lld", (long long)line->len);
+                        return -1;
+                }
+                line->alloc = sizeof(char) * line->len;
+        }
         
         return 0;
 }
@@ -796,4 +868,12 @@ int cut_Line(FileText * ftext, const FilePos * pos, char ch_new_line)
         Функция удаляет len символов начиная с позиции pos
         Затрагиваются все строки, находящиеся в диапазоне len
         Или лучше РЕДАКТИРУЕТ?
+*/
+
+
+/*
+        TODO
+        Функция заполняет структуру FilePos
+        В случае успеха возвращает 0
+        (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
 */
