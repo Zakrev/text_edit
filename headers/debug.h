@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 
+#define DBG_ALLOC_MEM
 #define DBG_LVL 2
 
 #if DBG_LVL >= 1

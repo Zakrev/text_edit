@@ -196,7 +196,7 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
         }
         unsigned long group_old_size = ftext->group_size;
         unsigned long group_old_count = ftext->groups_count;
-        
+
         ftext->group_size = MIN_GROUP_SIZE;
         while((ftext->lines_count / ftext->group_size) > MAX_GROUP_COUNT)
                 ftext->group_size *= 10;
@@ -204,11 +204,17 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
         ftext->groups_count += 1;
         if(ftext->group_size != group_old_size || ftext->groups_count != group_old_count){
                 if(ftext->lines_group != NULL){
+#ifdef DBG_ALLOC_MEM
+                        ftext->alloc_mem -= sizeof(Line *) * group_old_count;
+#endif
                         ftext->lines_group = realloc(ftext->lines_group, sizeof(Line *) * ftext->groups_count);
                         if(ftext->lines_group == NULL){
                                 PCERR("group = realloc");
                                 return -1;
                         }
+#ifdef DBG_ALLOC_MEM
+                        ftext->alloc_mem += sizeof(Line *) * ftext->groups_count;
+#endif
                         if(ftext->group_size != group_old_size){
                                 bzero(ftext->lines_group, ftext->groups_count);
                                 group_old_count = ftext->groups_count;
@@ -222,6 +228,9 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
                                 return -1;
                         }
                         bzero(ftext->lines_group, ftext->groups_count);
+#ifdef DBG_ALLOC_MEM
+                        ftext->alloc_mem += sizeof(Line *) * ftext->groups_count;
+#endif
                 }
         }
         unsigned long gr_idx;
@@ -331,11 +340,11 @@ static int read_lines_fd(FileText * ftext, const char * eol_chs, size_t eol_chs_
         }
         if(eol_chs == NULL){
                 PERR("ptr is NULL");
-                return NULL;
+                return -1;
         }
         if(eol_chs_len <= 0){
-                PERR("unexpected eol_chs_len: %lld", (long long)line_end_len);
-                return NULL;
+                PERR("unexpected eol_chs_len: %lld", (long long)eol_chs_len);
+                return -1;
         }
         if(lseek(ftext->fd, 0, SEEK_SET) == -1){
                 PCERR("lseek to start of file: %s", ftext->path);
@@ -350,6 +359,9 @@ static int read_lines_fd(FileText * ftext, const char * eol_chs, size_t eol_chs_
                 line = read_line_fd(ftext->fd, eol_chs, eol_chs_len);
                 if(line == NULL)
                         break;
+#ifdef DBG_ALLOC_MEM
+                ftext->alloc_mem += line->alloc;
+#endif
                 if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
                         ftext->lines_count += 1;
                         ftext->esize += line->len;
@@ -392,10 +404,11 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
                 return NULL;
         }
         if(eol_chs_len <= 0){
-                PERR("unexpected line_end_len: %lld", (long long)line_end_len);
+                PERR("unexpected line_end_len: %lld", (long long)eol_chs_len);
                 return NULL;
         }
         Line * first = NULL;
+        Line * line = NULL;
         Line lines_end;
         lines_end.type = main_editor_line_type_LINE_END;
         lines_end.next = NULL;
@@ -425,7 +438,7 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
         }
         
         if(lines_end.prev != NULL){
-                lines_end.prev.next = NULL;
+                lines_end.prev->next = NULL;
         }
         
         if(offset_len != 0){
@@ -439,6 +452,9 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
 static void free_groups(FileText * ftext)
 {
         PFUNC_START();
+#ifdef DBG_ALLOC_MEM
+        ftext->alloc_mem -= sizeof(Line *) * ftext->groups_count;
+#endif
         ftext->groups_count = 0;
         ftext->group_size = 0;
         free(ftext->lines_group);
@@ -456,6 +472,9 @@ static void free_lines(FileText * ftext)
                 if(ltmp != NULL){
                         erase_ListItem((ListItem *)ltmp);
                         ftext->esize -= ltmp->len;
+#ifdef DBG_ALLOC_MEM
+                        ftext->alloc_mem -= ltmp->alloc;
+#endif
                         free(ltmp->data);
                         free(ltmp);
                         ltmp = NULL;
@@ -583,7 +602,9 @@ int FileText_init(FileText * ftext, const char * eol_chs, unsigned char eol_chs_
                 eol_chs_len = MAX_EOL_CHS_LEN;
         memcpy(ftext->eol_chs, eol_chs, eol_chs_len);
         ftext->eol_chs_len = eol_chs_len;
-        
+#ifdef DBG_ALLOC_MEM
+        ftext->alloc_mem = sizeof(FileText);
+#endif
         PFUNC_END();
         return 0;
 }
@@ -640,7 +661,7 @@ FileText * FileText_open_file(const char * path)
         Line * line;
         FilePos cut_pos;
         
-        if(0 != fill_FilePos(ftext, &cut_pos, NULL, 6, 24)){
+        if(0 != fill_FilePos(ftext, &cut_pos, NULL, 6, 24, 0)){
                 PERR("fault fill FilePos");
         } else
                 if(0 != cut_Line(ftext, &cut_pos)){
@@ -649,14 +670,14 @@ FileText * FileText_open_file(const char * path)
         line = get_Line(ftext, 1);
         edit_Line(line, 0, 0, "helo ", 5);
         for(gridx = 0; gridx < ftext->groups_count && counte_print_lines >= lnum; gridx++){
-                printf("group: %ld\n", gridx);
+                printf("\ngroup: %ld", gridx);
                 grsize = ftext->group_size;
                 foreach_in_list(line, ftext->lines_group[gridx]){
                         if(line->type != main_editor_line_type_LINE)
                                 continue;
                         printf("\n%lu: ", lnum);
                         int i;
-                        for(i = 0; i < line->len; i++)
+                        for(i = 0; i < line->len - 1; i++)
                                 printf("%c", line->data[i]);
                         lnum += 1;
                         if(counte_print_lines < lnum)
@@ -666,9 +687,13 @@ FileText * FileText_open_file(const char * path)
                 }
         }
         /*TODO убрать\ */
+        /*Информация о файле*/
         PRINT("\n\tpath: %s\n", path);
         PRINT("\tsize: %lld\n", (long long)ftext->size);
         PRINT("\tlines: %lu\n", ftext->lines_count);
+#ifdef DBG_ALLOC_MEM
+        PRINT("\talloc mem: %lld\n", (long long)ftext->alloc_mem);
+#endif
         PFUNC_END();
         return ftext;
         free_return:
@@ -919,11 +944,21 @@ int cut_Line(FileText * ftext, FilePos * pos)
                                 ftext->esize = esize_tmp;
                                 return -1;
                         }
+#ifdef DBG_ALLOC_MEM
+                        ssize_t __dbg_alloc_mem_tmp__ = ftext->alloc_mem;
+                        ftext->alloc_mem -= fe_pos->line->alloc;
+#endif
                         if(0 != edit_Line(fe_pos->line, fe_pos->ch_idx, new_line->len, ftext->eol_chs, ftext->eol_chs_len)){
                                 PERR("fault erase chars");
+#ifdef DBG_ALLOC_MEM
+                                ftext->alloc_mem = __dbg_alloc_mem_tmp__;
+#endif
                                 ftext->esize = esize_tmp;
                                 return -1;
                         }
+#ifdef DBG_ALLOC_MEM
+                        ftext->alloc_mem += fe_pos->line->alloc;
+#endif
                         ftext->esize += fe_pos->line->len;
                 } else {
                         /*Полностью пустая строка*/
@@ -1037,7 +1072,7 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                 return -1;
         }
         if(data_len < 0){
-                PERR("unexpexted 'data_len': %lld", (long long)len);
+                PERR("unexpexted 'data_len': %lld", (long long)data_len);
                 return -1;
         }
         Line * new_lines = NULL;
@@ -1048,8 +1083,14 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                         PERR("fault read lines");
                         return -1;
                 }
+#ifdef DBG_ALLOC_MEM
+                Line * __debug_tmp__;
+                foreach_in_list(__debug_tmp__, new_lines){
+                        ftext->alloc_mem += __debug_tmp__->alloc;
+                }
+#endif
         }
-        if(len > 0){
+        if(pos->len > 0){
                 /*Вырезаем старые данные и стороки*/
                 
         }

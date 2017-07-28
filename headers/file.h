@@ -73,6 +73,10 @@ struct main_editor_file_text {
 	unsigned char eol_chs_len;              //Количество символов конца строки
 	
 	struct stat fstat;                      //Информация о файле
+	
+#ifdef DBG_ALLOC_MEM
+        ssize_t alloc_mem;                      //Выделено памяти под структуры
+#endif
 };
 
 /*
@@ -138,5 +142,5 @@ int cut_Line(FileText * ftext, FilePos * pos);
         В случае успеха возвращает 0
         (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
 */
-int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_idx, ssize_t ch_idx);
+int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_idx, ssize_t ch_idx, ssize_t len);
 #endif
