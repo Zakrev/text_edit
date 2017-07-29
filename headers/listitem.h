@@ -3,10 +3,16 @@
 
 #include "debug.h"
 
+enum list_item_types {
+        list_item_type_DEFAULT,
+        list_item_type_NOT_ERASE
+};
+
 typedef struct main_editor_listItem ListItem;
 struct main_editor_listItem {
-	ListItem * next;
-	ListItem * prev;
+        ListItem * next;
+        ListItem * prev;
+        unsigned int list_item_type;
 };
 
 #define foreach_in_list(__item__, __start__) \

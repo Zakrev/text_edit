@@ -60,7 +60,10 @@ int erase_ListItem(ListItem * item)
                 PERR("ptr is NULL");
                 return -1;
         }
-        
+        if(item->list_item_type == list_item_type_NOT_ERASE){
+                PERR("item type: list_item_type_NOT_ERASE");
+                return -1;
+        }
         if(item->next != NULL){
                 item->next->prev = item->prev;
         }

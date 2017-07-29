@@ -9,36 +9,38 @@
 #include "debug.h"
 #include "listitem.h"
 
-#define MAX_FILE_PATCH 255
-#define MIN_LINE_ALLOC_LENGHT 10
-#define MAX_GROUP_COUNT 200
-#define MIN_GROUP_SIZE 50
-#define MAX_EOL_CHS_LEN 1
+#define MAX_FILE_PATCH 255                      //длина полного пути файла
+#define MIN_LINE_ALLOC_LENGHT 10                //минимальный размер выделяемой памяти для строки
+#define MAX_LINE_LEN_TO_ALLOC_ALIGNMENT 5000    //максимальный размер данных, до которого будет выполняться выравнивание памяти для строк
+#define MAX_GROUP_COUNT 200                     //максимальное кол-во групп строк
+#define MIN_GROUP_SIZE 50                       //минимальный размер группы строк
+#define MAX_EOL_CHS_LEN 1                       //максимальная длина "символа" конца строки
 
 //#define USE_PTHREADS
 
 enum main_editor_line_type {
         main_editor_line_type_LINE,
         main_editor_line_type_LINE_0,
-        main_editor_line_type_LINE_END,
-        main_editor_line_type_unexpected
+        main_editor_line_type_LINE_END
 };
 
 typedef struct main_editor_line Line;
 struct main_editor_line {
-	Line * next;
-	Line * prev;
-	
-	unsigned int type;
-	ssize_t len;            //длина строки
-	char * data;            //данные строки
-	ssize_t alloc;          //выделено памяти под строку (может быть больше длины)
+        Line * next;
+        Line * prev;
+        unsigned int list_item_type;
+        
+        unsigned int type;
+        ssize_t len;            //длина строки
+        char * data;            //данные строки
+        ssize_t alloc;          //выделено памяти под строку (может быть больше длины)
 };
 
 typedef struct main_editor_file_position FilePos;
 struct main_editor_file_position {
         FilePos * next;
         FilePos * prev;
+        unsigned int list_item_type;
 
         Line * line;            //Указатель на строку ln_idx
         ssize_t ch_idx;         //Позиция первого выделенного символа в строке
@@ -58,22 +60,22 @@ struct main_editor_file_position {
 
 typedef struct main_editor_file_text FileText;
 struct main_editor_file_text {
-	int fd;
-	char path[MAX_FILE_PATCH + 1];
-	Line lines;			        //Строки
-	Line lines_end;	                        //Строки
-	unsigned long lines_count;		//Кол-во строк
-	Line ** lines_group;                    //Группы строк
-	unsigned long groups_count;		//Кол-во групп
-	unsigned long group_size;		//Размер группы
-	ssize_t size;				//Размер файла
-	ssize_t esize;				//Размер файла, во время редактирования
-	FilePos pos;                            //Позиция указателя в файле
-	char eol_chs[MAX_EOL_CHS_LEN];          //Символы конца строки
-	unsigned char eol_chs_len;              //Количество символов конца строки
-	
-	struct stat fstat;                      //Информация о файле
-	
+        int fd;
+        char path[MAX_FILE_PATCH + 1];
+        Line lines;                             //Строки
+        Line lines_end;                         //Строки
+        unsigned long lines_count;              //Кол-во строк
+        Line ** lines_group;                    //Группы строк
+        unsigned long groups_count;             //Кол-во групп
+        unsigned long group_size;               //Размер группы
+        ssize_t size;                           //Размер файла
+        ssize_t esize;                          //Размер файла, во время редактирования
+        FilePos pos;                            //Позиция указателя в файле
+        char eol_chs[MAX_EOL_CHS_LEN];          //Символы конца строки
+        unsigned char eol_chs_len;              //Количество символов конца строки
+        
+        struct stat fstat;                      //Информация о файле
+        
 #ifdef DBG_ALLOC_MEM
         ssize_t alloc_mem;                      //Выделено памяти под структуры
 #endif
@@ -143,4 +145,22 @@ int cut_Line(FileText * ftext, FilePos * pos);
         (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
 */
 int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_idx, ssize_t ch_idx, ssize_t len);
+
+/*
+        Функция редактирует текст (затрагивает несколько строк)
+        pos - позиция символа, с которого начнется редактирование
+        pos->len - длина заменяемых данных, данные начиная с pos (включая этот символ) и заканчивая pos->len-1 будут заменены
+                при pos->len == 0, данные data будут записаны перед символом pos
+        data - добавляемые данные
+                при data == NULL, данные начиная с pos (включая этот символ) и заканчивая pos->len-1 будут удалены
+        data_len - размер добавляемых данных
+                при data_len == 0, данные начиная с pos (включая этот символ) и заканчивая pos->len-1 будут удалены
+        Функция не записывает в конец строки символ конца строки, но может удалить
+        
+        В случае успеха возвращает 0
+        Изменяется размер файла
+        TODO:
+                удалить созданные строки в случае ошибки
+*/
+int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_len);
 #endif
