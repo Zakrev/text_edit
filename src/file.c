@@ -3,6 +3,20 @@
 /*
         STATIC FUNCTIONS
 */
+static void pLine(Line * line)
+{
+        if(line == NULL)
+                return;
+        PFUNC_START();
+        PRINT("%lld/%lld: ", (long long)line->len, (long long)line->alloc);
+        ssize_t i;
+        for(i = 0; i < line->len; i++){
+                PRINT("%c", line->data[i] == 0 ? '~' : line->data[i]);
+        }
+        PRINT("\n");
+        PFUNC_END();
+}
+
 static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len
 #ifdef DBG_ALLOC_MEM
         , ssize_t * alloc
@@ -66,7 +80,8 @@ static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len
 #if DBG_LVL >= 3
                 PRINT("new line is emrty\n");
 #endif
-                goto free_end;
+                bzero(line->data, MIN_LINE_ALLOC_LENGHT);
+                return line;
         }
         if(MAX_LINE_LEN_TO_ALLOC_ALIGNMENT > line->len && (line->len + 1) < line->alloc){
                 /*Выравниваем выделенную память*/
@@ -78,10 +93,7 @@ static Line * read_line_fd(int fd, const char * eol_chs, ssize_t eol_chs_len
                 line->alloc = sizeof(char) * (line->len + 1);
         }
 #if DBG_LVL >= 3
-        int dbg_i;
-        for(dbg_i = 0; dbg_i <= line->len; dbg_i++)
-                printf("%c", line->data[dbg_i]);
-        PRINT("\n");
+        pLine(line);
         PFUNC_END();
 #endif
 #ifdef DBG_ALLOC_MEM
@@ -287,7 +299,8 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
                         }
                         if(line == NULL){
                                 PERR("ptr is NULL");
-                                return -1;
+                                gr_idx = 0;
+                                break;
                         }
                         ftext->lines_group[gr_idx] = line;
                 }
@@ -306,8 +319,9 @@ static int create_lines_groups(FileText * ftext, unsigned long idx, unsigned lon
                                 diff -= 1;
                         }
                         if(line == NULL){
-                                PERR("line is NULL");
-                                return -1;
+                                PERR("ptr is NULL");
+                                gr_idx = 0;
+                                break;
                         }
                         ftext->lines_group[gr_idx] = line;
                 }
@@ -385,9 +399,9 @@ static void free_lines_Line(FileText * ftext, Line * lines)
                 count += 1;
         }
 #ifdef DBG_ALLOC_MEM
-        PINF("free lines: %lu: %lld\n", count, (long long)free_alloc);
+        PINF("free lines: %lu: %lld", count, (long long)free_alloc);
 #else
-        PINF("free lines: %lu\n", count);
+        PINF("free lines: %lu", count);
 #endif
         PFUNC_END();
 }
@@ -422,29 +436,54 @@ static int read_lines_fd(FileText * ftext, const char * eol_chs, size_t eol_chs_
         ftext->lines_count = 0;
         while(1){
                 /*Чтение строк*/
+                if(ftext->esize == ftext->size)
+                        break;
                 line = read_line_fd(ftext->fd, eol_chs, eol_chs_len
 #ifdef DBG_ALLOC_MEM
                                         , &ftext->alloc_mem
 #endif
                 );
-                if(line == NULL)
-                        break;
                 if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
                         ftext->lines_count += 1;
                         ftext->esize += line->len;
                 } else
                         break;
         }
-        PRINT("%lld / %lld\n", (long long)ftext->esize, (long long)ftext->size);
         if(ftext->lines_count == 0){
+                line = read_line_str(NULL, 0, NULL, 0
+#ifdef DBG_ALLOC_MEM
+                                        , &ftext->alloc_mem
+#endif
+                                );
+                if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
+                        ftext->lines_count += 1;
+                        ftext->esize += line->len;
+                }
+                PINF("%lu: %lld/%lld", ftext->lines_count, (long long)ftext->esize, (long long)ftext->size);
                 PFUNC_END();
-                return 0;
+                return create_lines_groups(ftext, 0, 0);;
         }
         if(ftext->esize != ftext->size){
                 PERR("Size of file not equal readed size: %s", ftext->path);
                 free_lines_Line(ftext, ftext->lines.next);
                 return -1;
         }
+        
+        line  = ftext->lines_end.prev;
+        if(ftext->eol_chs_len <= line->len)
+                if(0 == memcmp(line->data + (line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
+                        /*Создаем пустую строку, если последняя строка содержит символ eol*/
+                        line = read_line_str(NULL, 0, NULL, 0
+#ifdef DBG_ALLOC_MEM
+                                                , &ftext->alloc_mem
+#endif
+                                        );
+                        if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
+                                ftext->lines_count += 1;
+                                ftext->esize += line->len;
+                        }
+                }
+        PINF("%lu: %lld/%lld", ftext->lines_count, (long long)ftext->esize, (long long)ftext->size);
         PFUNC_END();
         return create_lines_groups(ftext, 0, 0);
 }
@@ -486,6 +525,9 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
         lines_end.prev = NULL;
         ssize_t offset = 0;
         ssize_t offset_len = data_len;
+#if DBG_LVL >= 2
+        unsigned long lines_count = 0;
+#endif
         
         /*Чтение первой строки*/
         first = read_line_str(data + offset, offset_len, eol_chs, eol_chs_len
@@ -497,7 +539,9 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
                 if(0 == insert_ListItem_offset_down((ListItem *)&lines_end, (ListItem *)first)){
                         offset_len -= first->len;
                         offset += first->len;
-                        
+#if DBG_LVL >= 2
+                        lines_count = 1;
+#endif
                         while(1){
                                 /*Чтение строк*/
                                 if(offset_len == 0)
@@ -507,13 +551,16 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
                                                         , alloc
 #endif
                                                         );
-                                if(line == NULL)
-                                        break;
                                 if(0 == insert_ListItem_offset_down((ListItem *)&lines_end, (ListItem *)line)){
                                         offset_len -= line->len;
                                         offset += line->len;
-                                } else
+#if DBG_LVL >= 2
+                                        lines_count += 1;
+#endif
+                                } else {
+                                        PERR("insert line");
                                         break;
+                                }
                         }
                 }
         }
@@ -527,7 +574,27 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
                 free_lines_Line(NULL, first);
                 return NULL;
         }
-        
+        /*
+                Пока не требуется
+        if(lines_end.prev != NULL){
+                line = lines_end.prev;
+                if(eol_chs_len <= line->len)
+                        if(0 == memcmp(line->data + (line->len - eol_chs_len), eol_chs, eol_chs_len)){
+                                /Создаем пустую строку, если последняя строка содержит символ eol/
+                                line = read_line_str(NULL, 0, NULL, 0
+#ifdef DBG_ALLOC_MEM
+                                                        , alloc
+#endif
+                                                );
+                                if(0 != insert_ListItem_offset_down((ListItem *)&lines_end, (ListItem *)line)){
+                                        PERR("insert line");
+                                }
+#if DBG_LVL >= 2
+                                lines_count += 1;
+#endif
+                        }
+        }*/
+        PINF("%lu: %lld/%lld", lines_count, (long long)data_len, (long long)data_len);
         PFUNC_END();
         return first;
 }
@@ -535,6 +602,10 @@ static Line * read_lines_str(const char * data, ssize_t data_len, const char * e
 static void free_groups(FileText * ftext)
 {
         PFUNC_START();
+        if(ftext->groups_count <= 0){
+                PINF("unexpected groups count: %lu", ftext->groups_count);
+                return;
+        }
 #ifdef DBG_ALLOC_MEM
         ftext->alloc_mem -= sizeof(Line *) * ftext->groups_count;
 #endif
@@ -584,9 +655,9 @@ static void free_lines(FileText * ftext)
                 count += 1;
         }
 #ifdef DBG_ALLOC_MEM
-        PINF("free lines: %lu: %lld\n", count, (long long)free_alloc);
+        PINF("free lines: %lu: %lld", count, (long long)free_alloc);
 #else
-        PINF("free lines: %lu\n", count);
+        PINF("free lines: %lu", count);
 #endif
         PFUNC_END();
 }
@@ -630,7 +701,7 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
         }
         ssize_t new_len = line->len;
         ssize_t pos, new_pos;
-                
+        
         if(len > 0){
                 if(line->data != NULL && line->len > 0){
                         /*Вырезаем символы*/
@@ -644,16 +715,16 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                 if(line->data != NULL){
                         /*Вставляем символы*/
                         new_len += data_len;
-                        if(new_len > line->alloc){
+                        if((new_len + 1) > line->alloc){
 #ifdef DBG_ALLOC_MEM
                                 *alloc -= line->alloc;
 #endif
-                                line->data = realloc(line->data, sizeof(char) * new_len);
+                                line->data = realloc(line->data, sizeof(char) * (new_len + 1));
                                 if(line->data == NULL){
-                                        PCERR("realloc %lld", (long long)new_len);
+                                        PCERR("realloc %lld", (long long)(new_len + 1));
                                         return -1;
                                 }
-                                line->alloc = sizeof(char) * new_len;
+                                line->alloc = sizeof(char) * (new_len + 1);
 #ifdef DBG_ALLOC_MEM
                                 *alloc += line->alloc;
 #endif
@@ -673,7 +744,7 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
         }
         if(data_len < len){
                 /*Убираем "пустоту" в строке*/
-                for(pos = start + len, new_pos = start + data_len; pos < new_len; pos++, new_pos++){
+                for(pos = start + len, new_pos = start + data_len; new_pos < new_len; pos++, new_pos++){
                         /*перемещаем старые данные*/
                         line->data[new_pos] = line->data[pos];
                 }
@@ -700,7 +771,6 @@ static int edit_Line(Line * line, ssize_t start, ssize_t len, const char * data,
                                 *alloc += line->alloc;
 #endif
         }
-        
         PFUNC_END();
         return 0;
 }
@@ -713,13 +783,10 @@ static int erase_from_Line(FileText * ftext, Line * line, ssize_t start, ssize_t
                 Изменяет размер файла
         */
         PFUNC_START();
-        ssize_t eol_chs_len;
+        ssize_t old_len = line->len;
 
-        if(keep_eof && line->len == len + start)
-                eol_chs_len = ftext->eol_chs_len;
-        else
-                eol_chs_len = 0;
-        if(0 != edit_Line(line, start, len, ftext->eol_chs, eol_chs_len
+        if(0 != edit_Line(line, start, len, ftext->eol_chs, 
+                         keep_eof && line->len == (len + start) ? ftext->eol_chs_len : 0
 #ifdef DBG_ALLOC_MEM
                         , &ftext->alloc_mem
 #endif
@@ -727,7 +794,7 @@ static int erase_from_Line(FileText * ftext, Line * line, ssize_t start, ssize_t
                 PERR("fault edit line");
                 return -1;
         }
-        ftext->esize -= len;
+        ftext->esize -= (old_len - line->len);
         
         PFUNC_END();
         return 0;
@@ -824,6 +891,9 @@ FileText * FileText_open_file(const char * path)
                free_groups(ftext);
                goto free_return;
         }
+        /*Закрываем файл*/
+        /*close(ftext->fd);
+        ftext->fd = 0;*/
         pfinf(ftext);
         /*TODO убрать*/
         unsigned long gridx;
@@ -833,21 +903,25 @@ FileText * FileText_open_file(const char * path)
         Line * line;
         FilePos pos;
         
-        if(0 != fill_FilePos(ftext, &pos, NULL, 3, 6, 0)){
+        /*if(0 != fill_FilePos(ftext, &pos, NULL, 1, 0, 17)){
                 PERR("fault fill FilePos");
         } else
-                edit_text(ftext, &pos, "Hello world", strlen("Hello world"));
+                edit_text(ftext, &pos, "Hello world\nHello world!\n", strlen("Hello world\nHello world!\n"));*/
+        if(0 != fill_FilePos(ftext, &pos, NULL, 1, 0, 63782)){
+                PERR("fault fill FilePos");
+        } else
+                edit_text(ftext, &pos, NULL, 0);
         PRINT("\nFILE");
         for(gridx = 0; gridx < ftext->groups_count && counte_print_lines >= lnum; gridx++){
                 printf("\ngroup: %ld", gridx);
                 grsize = ftext->group_size;
                 foreach_in_list(line, ftext->lines_group[gridx]){
-                        if(line->type != main_editor_line_type_LINE)
-                                continue;
-                        printf("\n%lu: %lld: ", lnum, (long long)line->len);
+                        if(line->type == main_editor_line_type_LINE_END)
+                                break;
+                        printf("\n%lu: %lld/%lld: ", lnum, (long long)line->len, (long long)line->alloc);
                         int i;
                         for(i = 0; i < line->len; i++)
-                                printf("%c", line->data[i]);
+                                printf("%c", line->data[i] == '\0' ? '~' : line->data[i]);
                         lnum += 1;
                         if(counte_print_lines < lnum)
                                 break;
@@ -856,6 +930,8 @@ FileText * FileText_open_file(const char * path)
                 }
         }
         PRINT("\nFILE\n");
+        //write_to_file(ftext);
+        //close(ftext->fd);
         pfinf(ftext);
         free_lines(ftext);
         free_groups(ftext);
@@ -869,6 +945,37 @@ FileText * FileText_open_file(const char * path)
                return NULL;
 }
 
+int write_to_file(FileText * ftext)
+{
+        /*
+                Функция записывает изменения в файл
+                В случае успеха возвращает 0
+        */
+        PFUNC_START();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        Line * line = ftext->lines.next;
+        /*
+        TODO: записывать не весь файл, а только изменения
+        Line * line = get_Line(ftext, ftext->min_edit_idx);
+        if(line == NULL){
+                PERR("fault get first line: %lu", ftext->min_edit_idx);
+                return -1;
+        }
+        */
+        ftruncate(ftext->fd, ftext->esize);
+        lseek(ftext->fd, 0, SEEK_SET);
+        foreach_in_list(line, line){
+                if(line->type != main_editor_line_type_LINE)
+                        continue;
+                write(ftext->fd, line->data, line->len);
+        }
+        PFUNC_END();
+        return 0;
+}
+
 Line * get_Line(FileText * ftext, unsigned long idx)
 {
         /*
@@ -876,6 +983,11 @@ Line * get_Line(FileText * ftext, unsigned long idx)
                 Либо NULL
         */
         PFUNC_START();
+        if(ftext == NULL){
+                PERR("ptr is NULL");
+                return NULL;
+        }
+        
         Line * line = NULL;
         unsigned long gr_idx;
         unsigned long tmp;
@@ -1098,7 +1210,7 @@ int cut_Line(FileText * ftext, FilePos * pos)
                         return -1;
                 }
                 if(fe_pos->line->len > 0){
-                        if(fe_pos->ch_idx < 0 || fe_pos->ch_idx >= fe_pos->line->len){
+                        if(fe_pos->ch_idx < 0 || fe_pos->ch_idx > fe_pos->line->len){
                                 PERR("unexpected ch_idx: %lld", (long long)fe_pos->ch_idx);
                                 return -1;
                         }
@@ -1125,10 +1237,6 @@ int cut_Line(FileText * ftext, FilePos * pos)
                                                         , &ftext->alloc_mem
 #endif
                                                 );
-                        if(new_line == NULL){
-                                PERR("fault create item");
-                                return -1;
-                        }
                         if(0 != insert_ListItem_offset_down((ListItem *)&new_lines_end, (ListItem *)new_line)){
                                 PERR("fault insert item");
                                 return -1;
@@ -1196,7 +1304,7 @@ int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_
         }
         
         pos->ln_idx = ln_idx;
-        if(ch_idx < 0 || ch_idx >= pos->line->len){
+        if(ch_idx < 0 || ch_idx > pos->line->len){
                 PERR("unexpected ch_idx: %lld", (long long)ch_idx);
                 return -1;
         }
@@ -1222,7 +1330,6 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                         при data == NULL, данные начиная с pos (включая этот символ) и заканчивая pos->len-1 будут удалены
                 data_len - размер добавляемых данных
                         при data_len == 0, данные начиная с pos (включая этот символ) и заканчивая pos->len-1 будут удалены
-                Функция не записывает в конец строки символ конца строки, но может удалить
                 
                 В случае успеха возвращает 0
                 Изменяется размер файла
@@ -1310,20 +1417,27 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                         /*Удаляемые данные НЕ выходят за строку в pos*/
                         if(0 != erase_from_Line(ftext, pos->line, pos->ch_idx, pos->len, 0))
                                 return -1;
-                }
-        }
-        if(data_len > 0 && data != NULL){
-                /*Вставляем новые данные и строки*/
-                if(last_line == NULL){
                         /*Делим первую строку на две*/
                         if(0 != cut_Line(ftext, pos)){
                                 PERR("fault cut line");
                                 return -1;
                         }
-                        if(0 != erase_from_Line(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
-                                return -1;
+                        lines_old_count = ftext->lines_count;
+                        if(ftext->eol_chs_len <= pos->line->len)
+                                if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
+                                        /*Вырезаем символ eol*/
+                                        if(0 != erase_from_Line(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
+                                                return -1;
+                                }
                         last_line = pos->line->next;
                 }
+        }
+        if(last_line == NULL){
+                PERR("ptr is NULL");
+                return -1;
+        }
+        if(data_len > 0 && data != NULL){
+                /*Вставляем новые данные и строки*/
                 /*Формируем строки из текста*/
                 new_lines = read_lines_str(data, data_len, ftext->eol_chs, ftext->eol_chs_len
 #ifdef DBG_ALLOC_MEM
@@ -1340,15 +1454,15 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                         tmp_line = NULL;
                         if(new_lines->next != NULL){
                                 foreach_in_list(new_lines, new_lines->next){
-                                if(tmp_line != NULL){
-                                        erase_ListItem((ListItem *)tmp_line);
-                                        insert_ListItem_offset_down((ListItem *)last_line, (ListItem *)tmp_line);
-                                        ftext->esize += tmp_line->len;
-                                        ftext->lines_count += 1;
-                                }
-                                if(new_lines->next == NULL)
-                                        break;
-                                tmp_line = new_lines;
+                                        if(tmp_line != NULL){
+                                                erase_ListItem((ListItem *)tmp_line);
+                                                insert_ListItem_offset_down((ListItem *)last_line, (ListItem *)tmp_line);
+                                                ftext->esize += tmp_line->len;
+                                                ftext->lines_count += 1;
+                                        }
+                                        tmp_line = new_lines;
+                                        if(new_lines->next == NULL)
+                                                break;
                                 }
                                 if(tmp_line != NULL){
                                         new_lines = tmp_line->prev;
@@ -1359,10 +1473,6 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                                 }
                         }
                 }
-        }
-        if(last_line == NULL){
-                PFUNC_END();
-                return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
         }
         if(new_lines != NULL){
                 /*Склеиваем строки после вставки новых данных*/
@@ -1378,81 +1488,22 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                 tmp_line = new_lines->next;
                 if(tmp_line == NULL){
                         /*Была вставлена только одна строка*/
-                        if(ftext->eol_chs_len <= pos->line->len)
-                                if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
-                                        /*Строка pos->line имеет символ eol*/
-                                        free_lines_Line(ftext, new_lines);
-                                        
-                                        PFUNC_END();
-                                        return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
-                                }
-                        if(last_line->len == 0 && last_line->next->type != main_editor_line_type_LINE_END){
-                                if(0 != edit_Line(pos->line, pos->line->len, 0, ftext->eol_chs, ftext->eol_chs_len
-#ifdef DBG_ALLOC_MEM
-                                                        , &ftext->alloc_mem
-#endif
-                                                        )){
-                                        PERR("fault edit line");
-                                        goto err_free_end;
-                                }
-                        } else
-                                if(0 != edit_Line(pos->line, pos->line->len, 0, last_line->data, last_line->len
-#ifdef DBG_ALLOC_MEM
-                                                        , &ftext->alloc_mem
-#endif
-                                                        )){
-                                        PERR("fault edit line");
-                                        goto err_free_end;
-                                }
-                        erase_ListItem((ListItem *)last_line);
-                        insert_ListItem_offset_down((ListItem *)new_lines, (ListItem *)last_line);
-                        ftext->lines_count -= 1;
-                        free_lines_Line(ftext, last_line);
-                } else {
-                        /*Было вставлено больше одной строки*/
-                        if(ftext->eol_chs_len <= tmp_line->len)
-                                if(0 == memcmp(tmp_line->data + (tmp_line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
-                                        /*Строка tmp_line имеет символ eol*/
-                                        erase_ListItem((ListItem *)tmp_line);
-                                        insert_ListItem_offset_down((ListItem *)last_line, (ListItem *)tmp_line);
-                                        ftext->esize += tmp_line->len;
-                                        ftext->lines_count += 1;
-                                        free_lines_Line(ftext, new_lines);
-                                        
-                                        PFUNC_END();
-                                        return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
-                                }
-                        if(0 != edit_Line(last_line, 0, 0, tmp_line->data, tmp_line->len
-#ifdef DBG_ALLOC_MEM
-                                                , &ftext->alloc_mem
-#endif
-                                                )){
-                                PERR("fault edit line");
-                                goto err_free_end;
-                        }
-                        free_lines_Line(ftext, new_lines);
-                }
-        } else {
-                if(pos->line->next == last_line){
-                        /*Склеиваем строки после удаления данных*/
-                        if(last_line->len == 0 && pos->line->len == 0){
+                        if(last_line->len == 0 && last_line->next->type  == main_editor_line_type_LINE){
                                 erase_ListItem((ListItem *)last_line);
+                                insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
                                 ftext->lines_count -= 1;
-                                free_lines_Line(ftext, last_line);
-                                
-                                erase_ListItem((ListItem *)pos->line);
-                                ftext->lines_count -= 1;
-                                free_lines_Line(ftext, pos->line);
-                                
-                                PFUNC_END();
-                                return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
+                                last_line = pos->line->next;
                         }
+                        
                         if(ftext->eol_chs_len <= pos->line->len)
                                 if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
                                         /*Строка pos->line имеет символ eol*/
+                                        free_lines_Line(ftext, new_lines);
+                                        
                                         PFUNC_END();
                                         return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
                                 }
+                        
                         if(0 != edit_Line(pos->line, pos->line->len, 0, last_line->data, last_line->len
 #ifdef DBG_ALLOC_MEM
                                                 , &ftext->alloc_mem
@@ -1462,9 +1513,82 @@ int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_l
                                 goto err_free_end;
                         }
                         erase_ListItem((ListItem *)last_line);
+                        insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
+                        
                         ftext->lines_count -= 1;
-                        free_lines_Line(ftext, last_line);
+                        free_lines_Line(ftext, new_lines);
+                } else {
+                        /*Было вставлено больше одной строки*/
+                        erase_ListItem((ListItem *)tmp_line);
+                        insert_ListItem_offset_down((ListItem *)last_line, (ListItem *)tmp_line);
+                        ftext->esize += tmp_line->len;
+                        ftext->lines_count += 1;
+                        
+                        if(last_line->len == 0 && last_line->next->type == main_editor_line_type_LINE){
+                                erase_ListItem((ListItem *)last_line);
+                                insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
+                                ftext->lines_count -= 1;
+                                last_line = tmp_line->next;
+                        }
+                        
+                        if(ftext->eol_chs_len <= tmp_line->len)
+                                if(0 == memcmp(tmp_line->data + (tmp_line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
+                                        /*Строка tmp_line имеет символ eol*/
+                                        free_lines_Line(ftext, new_lines);
+                                        
+                                        PFUNC_END();
+                                        return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
+                                }
+
+                        if(0 != edit_Line(tmp_line, tmp_line->len, 0, last_line->data, last_line->len
+#ifdef DBG_ALLOC_MEM
+                                                , &ftext->alloc_mem
+#endif
+                                                )){
+                                PERR("fault edit line");
+                                goto err_free_end;
+                        }
+                        
+                        erase_ListItem((ListItem *)last_line);
+                        insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
+                        
+                        ftext->lines_count -= 1;
+                        free_lines_Line(ftext, new_lines);
                 }
+        } else {
+                /*Склеиваем строки после удаления данных*/
+                if(last_line->len == 0 && last_line->next->type == main_editor_line_type_LINE){
+                        erase_ListItem((ListItem *)last_line);
+                        new_lines = last_line;
+                        ftext->lines_count -= 1;
+                        last_line = pos->line->next;
+                }
+                
+                if(ftext->eol_chs_len <= pos->line->len)
+                        if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
+                                /*Строка pos->line имеет символ eol*/
+                                free_lines_Line(ftext, new_lines);
+                                
+                                PFUNC_END();
+                                return create_lines_groups(ftext, pos->ln_idx, lines_old_count);
+                        }
+                
+                if(0 != edit_Line(pos->line, pos->line->len, 0, last_line->data, last_line->len
+#ifdef DBG_ALLOC_MEM
+                                        , &ftext->alloc_mem
+#endif
+                                        )){
+                        PERR("fault edit line");
+                        goto err_free_end;
+                }
+                erase_ListItem((ListItem *)last_line);
+                if(new_lines != NULL)
+                        insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
+                else
+                        new_lines = last_line;
+                
+                ftext->lines_count -= 1;
+                free_lines_Line(ftext, new_lines);
         }
         
         PFUNC_END();

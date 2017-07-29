@@ -1,7 +1,9 @@
-#if DBG_LVL >= 3
-        PFUNC_START();
-#endif
-        Line * line;
-        size_t max_len;
-        ssize_t offset = 0;
-        int rc;
+#ifndef _FILE_H_
+#define _FILE_H_
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include "debug.h"
+#include "listitem.h"

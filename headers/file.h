@@ -94,6 +94,12 @@ int FileText_init(FileText * ftext, const char * eol_chs, unsigned char eol_chs_
 FileText * FileText_open_file(const char * path);
 
 /*
+        Функция записывает изменения в файл
+        В случае успеха возвращает 0
+*/
+int write_to_file(FileText * ftext);
+
+/*
         Возвращает указатель на линию idx
         Либо NULL
 */
