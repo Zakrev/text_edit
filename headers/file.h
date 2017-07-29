@@ -11,7 +11,7 @@
 
 #define MAX_FILE_PATCH 255                      //длина полного пути файла
 #define MIN_LINE_ALLOC_LENGHT 10                //минимальный размер выделяемой памяти для строки
-#define MAX_LINE_LEN_TO_ALLOC_ALIGNMENT 5000    //максимальный размер данных, до которого будет выполняться выравнивание памяти для строк
+#define MAX_LINE_LEN_TO_ALLOC_ALIGNMENT 100     //максимальный размер данных, до которого будет выполняться выравнивание памяти для строк
 #define MAX_GROUP_COUNT 200                     //максимальное кол-во групп строк
 #define MIN_GROUP_SIZE 50                       //минимальный размер группы строк
 #define MAX_EOL_CHS_LEN 1                       //максимальная длина "символа" конца строки
@@ -89,7 +89,7 @@ struct main_editor_file_text {
 int FileText_init(FileText * ftext, const char * eol_chs, unsigned char eol_chs_len);
 
 /*
-        Открывает файл и представляет его содержимое в структупах
+        Открывает файл и представляет его содержимое в структурах
 */
 FileText * FileText_open_file(const char * path);
 
@@ -100,7 +100,7 @@ FileText * FileText_open_file(const char * path);
 int write_to_file(FileText * ftext);
 
 /*
-        Возвращает указатель на линию idx
+        Возвращает указатель на строку idx
         Либо NULL
 */
 Line * get_Line(FileText * ftext, unsigned long idx);
@@ -134,7 +134,7 @@ int insert_Line_up(FileText * ftext, FilePos * pos, Line * line);
                 pos->ch_idx
                 pos->ln_idx (можно 0)
         После разрезания текущей линии остается левая часть данных,
-        создается новая линия послей текущей, с "правыми" данными текущей.
+        создается новая линия после текущей, с "правыми" данными текущей.
         Символ в позиции ch_idx является началом "правых" данных.
         Например:
         разрезать       l2-l3-l6 из l1-l2-l3-l4-l5-l6
@@ -148,7 +148,6 @@ int cut_Line(FileText * ftext, FilePos * pos);
         Функция заполняет структуру FilePos
         Если line == NULL, то ищет строку по ln_idx
         В случае успеха возвращает 0
-        (FilePos * pos, unsigned long ln_idx, ssize_t ch_idx)
 */
 int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_idx, ssize_t ch_idx, ssize_t len);
 
@@ -165,8 +164,6 @@ int fill_FilePos(FileText * ftext, FilePos * pos, Line * line, unsigned long ln_
         
         В случае успеха возвращает 0
         Изменяется размер файла
-        TODO:
-                удалить созданные строки в случае ошибки
 */
 int edit_text(FileText * ftext, FilePos * pos, const char * data, ssize_t data_len);
 #endif
