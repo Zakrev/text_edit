@@ -1,17 +1,31 @@
 #include "../headers/main.h"
 
-/*
-static int parse_args(int args, char ** arg)
-{
-	
-	
-	return 0;
-}
-*/
-
 int main(int args, char ** arg)
 {
-	FileText * ftext = FileText_open_file(arg[1]);
+	FileText ftext;
+	FilePos pos;
+	char buff[512];
+	
+	if(0 != init_FileText(&ftext, "\n", 1))
+	        return -1;
+	        
+	if(0 != read_from_file_FileText(&ftext, arg[1]))
+	        return -1;
+	        
+	if(0 != fill_pos_FileText(&ftext, &pos, NULL, 1, 0, ftext.esize))
+	        return -1;
+	        
+	if(0 >= get_data_by_pos_FileText(&ftext, &pos, buff, 512))
+	        return -1;
+	
+	if(0 != fill_pos_FileText(&ftext, &pos, NULL, 1, 0, 0))
+	        return -1;
+	
+	if(0 != edit_lines_by_pos_FileText(&ftext, &pos, buff, ftext.esize))
+	        return -1;
+	        
+	if(0 != write_to_file_FileText(&ftext, "tmp_file"))
+	        return -1;
 
-	return 0;
+	return close_file_FileText(&ftext);
 }

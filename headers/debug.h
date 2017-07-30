@@ -21,7 +21,6 @@
 #define PINF(...) fprintf(stdout, "NOTICE: %s: %d: %s: ", __FILE__, __LINE__, __FUNCTION__); fprintf(stdout, __VA_ARGS__); fprintf(stdout, "\n"); fflush(stdout)
 #define PRINT(...) fprintf(stdout, __VA_ARGS__); fflush(stdout)
 
-//#include <time.h>
 #include <sys/time.h>
 double __time_exec_wtime__();
 #define PFUNC_START() \
