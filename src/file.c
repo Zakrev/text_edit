@@ -8,7 +8,7 @@ static void pline(Line * line)
 {
         bytes_t i;
         for(i = 0; i < line->len; i++){
-                PRINT("%c", line->data[i] == 0 ? '▓' : line->data[i]);
+                PRINT("%c", line->data[i] == 0 ? '~' : line->data[i]);
         }
 }
 #endif
@@ -22,7 +22,7 @@ static void pfinf(FileText * ftext, const char * path)
         PRINT("FILE_INFO\n");
         PRINT("path: %s\n", path);
         PRINT("esize: %lld\n", (long long)ftext->esize);
-        PRINT("lines: %ld\n", ftext->lines_count);
+        PRINT("lines: %u\n", ftext->lines_count);
         PRINT("groups: %hu * %hu\n", ftext->groups_count, ftext->group_size);
 #ifdef DBG_ALLOC_MEM
         PRINT("alloc mem: %lu + %lu + %lld\n", sizeof(FileText), (unsigned long)sizeof(Line *) * ftext->groups_count,
@@ -128,7 +128,7 @@ static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char 
                 return NULL;
 }
 
-static Line * read_line_str(const char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
+static Line * read_line_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef DBG_ALLOC_MEM
                                 , bytes_t * alloc
 #endif
@@ -154,7 +154,6 @@ static Line * read_line_str(const char * data, bytes_t data_len, const unsigned 
         }
         Line * line;
         bytes_t offset = 0;
-        int rc;
         
         line = malloc(sizeof(Line));
         if(line == NULL){
@@ -318,7 +317,7 @@ static char create_lines_groups(FileText * ftext)
                 ln_idx += 1;
         }
 #endif
-        PRINT("%hh * %h\n", ftext->groups_count, ftext->group_size);
+        PRINT("%hu * %hu\n", ftext->groups_count, ftext->group_size);
         PFUNC_END();
         return 0;
 }
@@ -368,9 +367,9 @@ static void free_lines_Line(FileText * ftext, Line * lines)
                 count += 1;
         }
 #ifdef DBG_ALLOC_MEM
-        PINF("free lines: %ld: %lld", count, (long long)free_alloc);
+        PINF("free lines: %u: %lld", count, (long long)free_alloc);
 #else
-        PINF("free lines: %ld", count);
+        PINF("free lines: %u", count);
 #endif
         PFUNC_END();
 }
@@ -402,7 +401,7 @@ static Line * read_lines_path(const char * path, const unsigned char * eol_chs, 
                 return NULL;
         }
         if(eol_chs_len <= 0){
-                PERR("unexpected eol_chs_len: %hh", eol_chs_len);
+                PERR("unexpected eol_chs_len: %hu", eol_chs_len);
                 return NULL;
         }
         int fd;
@@ -479,7 +478,7 @@ static Line * read_lines_path(const char * path, const unsigned char * eol_chs, 
         
         if(end_lines.prev != NULL)
                         end_lines.prev->next = NULL;
-        PINF("created lines: %ld", lines_count);
+        PINF("created lines: %u", lines_count);
         PFUNC_END();
         return first_line;
         
@@ -491,7 +490,7 @@ static Line * read_lines_path(const char * path, const unsigned char * eol_chs, 
                 return NULL;
 }
 
-static Line * read_lines_str(const char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
+static Line * read_lines_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef DBG_ALLOC_MEM
                                 , bytes_t * alloc
 #endif
@@ -572,7 +571,7 @@ static Line * read_lines_str(const char * data, bytes_t data_len, const unsigned
         
         if(end_lines.prev != NULL)
                         end_lines.prev->next = NULL;
-        PINF("created lines: %ld", lines_count);
+        PINF("created lines: %u", lines_count);
         PFUNC_END();
         return first_line;
         
@@ -591,7 +590,7 @@ static void free_groups(FileText * ftext)
         */
         PFUNC_START();
         if(ftext->groups_count <= 0){
-                PINF("unexpected groups count: %hh", ftext->groups_count);
+                PINF("unexpected groups count: %hu", ftext->groups_count);
                 return;
         }
 #ifdef DBG_ALLOC_MEM
@@ -652,9 +651,9 @@ static void free_lines(FileText * ftext)
                 count += 1;
         }
 #ifdef DBG_ALLOC_MEM
-        PINF("free lines: %ld: %lld", count, (long long)free_alloc);
+        PINF("free lines: %u: %lld", count, (long long)free_alloc);
 #else
-        PINF("free lines: %ld", count);
+        PINF("free lines: %u", count);
 #endif
         PFUNC_END();
 }
@@ -817,6 +816,9 @@ static char add_free_line(FileText * ftext)
                 Добавляет пустую строку в конец файла, если это необходимо
                 Изменяет размер файла
                 Изменяет mem alloc
+                Возвращает:
+                        OK      0
+                        ERR     -1
         */
         PFUNC_START();
         if(ftext == NULL){
@@ -988,6 +990,10 @@ char read_from_file_FileText(FileText * ftext, const char * path)
                 free_lines_Line(ftext, file);
                 return -1;
         }
+        if(0 != add_free_line(ftext)){
+                free_lines(ftext);
+                return -1;
+        }
         pfinf(ftext, path);
         
         PFUNC_END();
@@ -1073,7 +1079,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
         unsigned int ln_idx;
 
         if(idx > ftext->lines_count){
-                PERR("unexpected idx: %ld", idx);
+                PERR("unexpected idx: %u", idx);
                 return NULL;
         }
         if(idx == 0)
@@ -1108,7 +1114,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
                         ln_idx = ftext->lines_count;
                 } else {
                         if(ftext->lines_group[gr_idx] == NULL){
-                                PERR("gr_idx is NULL: %ld", gr_idx);
+                                PERR("gr_idx is NULL: %hu", gr_idx);
                                 return NULL;
                         }
                         start = ftext->lines_group[gr_idx]->prev;
@@ -1125,7 +1131,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
                 }
         }
         if(line == NULL){
-                PERR("fault: %ld - %ld", ln_idx, idx);
+                PERR("fault: %u - %u", ln_idx, idx);
         }
         
         return NULL;
@@ -1169,7 +1175,7 @@ char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * l
         foreach_in_list(fe_line, line){
                 if(tmp_line != NULL){
                         if(0 != insert_ListItem_offset_down((ListItem *)pos->line, (ListItem *)tmp_line)){
-                                PERR("fault insert item: %ld", ftext->lines_count);
+                                PERR("fault insert item: %u", ftext->lines_count);
                                 return -1;
                         }
                         ftext->lines_count += 1;
@@ -1180,7 +1186,7 @@ char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * l
         if(tmp_line != NULL){
                 /*Последний item*/
                 if(0 != insert_ListItem_offset_down((ListItem *)pos->line, (ListItem *)tmp_line)){
-                        PERR("fault insert item: %ld", ftext->lines_count);
+                        PERR("fault insert item: %u", ftext->lines_count);
                         return -1;
                 }
                 ftext->lines_count += 1;
@@ -1230,7 +1236,7 @@ char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * lin
         foreach_in_list(fe_line, line){
                 if(tmp_line != NULL){
                         if(0 != insert_ListItem_offset_up((ListItem *)insert_pos, (ListItem *)tmp_line)){
-                                PERR("fault insert item: %ld", ftext->lines_count);
+                                PERR("fault insert item: %u", ftext->lines_count);
                                 return -1;
                         }
                         insert_pos = tmp_line;
@@ -1242,7 +1248,7 @@ char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * lin
         if(tmp_line != NULL){
                 /*Последний item*/
                 if(0 != insert_ListItem_offset_up((ListItem *)insert_pos, (ListItem *)tmp_line)){
-                        PERR("fault insert item: %ld", ftext->lines_count);
+                        PERR("fault insert item: %u", ftext->lines_count);
                         return -1;
                 }
                 ftext->lines_count += 1;
@@ -1303,7 +1309,7 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
                                 PERR("unexpected ch_idx: %lld", (long long)pos->ch_idx);
                                 return NULL;
                         }
-                        new_line = read_line_str(pos->line->data + pos->ch_idx, pos->line->len - pos->ch_idx, ftext->eol_chs, ftext->eol_chs_len
+                        new_line = read_line_str((const unsigned char *)pos->line->data + pos->ch_idx, pos->line->len - pos->ch_idx, ftext->eol_chs, ftext->eol_chs_len
 #ifdef DBG_ALLOC_MEM
                                                         , &ftext->alloc_mem
 #endif
@@ -1404,7 +1410,7 @@ char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned in
         if(line == NULL){
                 pos->line = get_line_by_idx_FileText(ftext, ln_idx);
                 if(pos->line == NULL){
-                        PERR("line not found: %ld", ln_idx);
+                        PERR("line not found: %u", ln_idx);
                         return -1;
                 }
         } else {
@@ -1567,7 +1573,7 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
         if(data_len > 0 && data != NULL){
                 /*Вставляем новые данные и строки*/
                 /*Формируем строки из текста*/
-                new_lines = read_lines_str(data, data_len, ftext->eol_chs, ftext->eol_chs_len
+                new_lines = read_lines_str((const unsigned char *)data, data_len, ftext->eol_chs, ftext->eol_chs_len
 #ifdef DBG_ALLOC_MEM
                                                 , &ftext->alloc_mem
 #endif
