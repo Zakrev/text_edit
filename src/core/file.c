@@ -1,5 +1,6 @@
-#include "../headers/debug.h"
-#include "../headers/file.h"
+#define DBG_LVL 1
+#include "../debug.h"
+#include "file.h"
 
 /*
 	STATIC FUNCTIONS

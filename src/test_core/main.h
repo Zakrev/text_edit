@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "file.h"
+#include "../core/file.h"
+#include "../core/editor.h"
 
 #endif

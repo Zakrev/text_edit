@@ -1,2 +1,0 @@
-all		compile project to dir 'bin'
-clean		remove dir 'bin'

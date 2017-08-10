@@ -1,5 +1,5 @@
-#include "../headers/debug.h"
-#include "../headers/editor.h"
+#include "../debug.h"
+#include "editor.h"
 
 /*
         STATIC FUNCTIONS

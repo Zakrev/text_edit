@@ -1,6 +1,6 @@
 #define DBG_LVL 1
-#include "../headers/debug.h"
-#include "../headers/listitem.h"
+#include "../debug.h"
+#include "listitem.h"
 
 int insert_ListItem_offset_down(ListItem * pos, ListItem * item)
 {
