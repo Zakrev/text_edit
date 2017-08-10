@@ -1,3 +1,4 @@
+#include "../headers/debug.h"
 #include "../headers/editor.h"
 
 /*
