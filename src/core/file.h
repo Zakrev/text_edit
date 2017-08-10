@@ -33,20 +33,20 @@
 */
 typedef ssize_t bytes_t;
 
-enum main_editor_line_type {
+enum teLine_type {
 	/*Строка с данными*/
-	main_editor_line_type_LINE,
+	teLine_type_LINE,
 	
 	/*Неудаляемые строки*/
-	main_editor_line_type_LINE_0,
-	main_editor_line_type_LINE_END
+	teLine_type_OPEN,
+	teLine_type_CLOSE
 };
 
-typedef struct main_editor_line Line;
-struct main_editor_line {
+typedef struct teLine teLine;
+struct teLine {
 	/*ListItem*/
-	Line * next;
-	Line * prev;
+	teLine * next;
+	teLine * prev;
 	unsigned char list_item_type;
 	
 	/*Строка*/
@@ -56,41 +56,40 @@ struct main_editor_line {
 	bytes_t alloc;
 };
 
-typedef struct main_editor_file_position FilePos;
-struct main_editor_file_position {
+typedef struct tePos tePos;
+struct tePos {
 	/*ListItem*/
-	FilePos * next;
-	FilePos * prev;
+	tePos * next;
+	tePos * prev;
 	unsigned char list_item_type;
 	
 	/*Позиция*/
-	Line * line;
+	teLine * line;
 	bytes_t ch_idx;
 	unsigned int ln_idx;
 	bytes_t len;
 };
 
 /*
-	В файле хранятся две пустые строки (объекты Line: lines и lines_end).
+	В файле хранятся две пустые строки (объекты teLine: lines и lines_end).
 	Они не удаляются и не создаются.
 	Нужны только для хранения других строк.
 	
 	В циклах лучше проверять:
-	if(line->type != main_editor_line_type_LINE)
+	if(line->type != teLine_type_LINE)
 			continue;
 */
-
-typedef struct main_editor_file_text FileText;
-struct main_editor_file_text {
+typedef struct teText teText;
+struct teText {
 	/*Строки*/
-	Line lines;
-	Line lines_end;
+	teLine open;
+	teLine close;
 	unsigned int lines_count;
 	unsigned char eol_chs[MAX_EOL_CHS_LEN];
 	unsigned char eol_chs_len;
 	
 	/*Группы строк*/
-	Line ** lines_group;
+	teLine ** lines_group;
 	unsigned char groups_count;
 	unsigned short group_size;
 	
@@ -102,14 +101,14 @@ struct main_editor_file_text {
 };
 
 /*
-	Инициализирует структуру FileText_init
+	Инициализирует структуру teText_init
 	eol_chs	- байты конца строки
 	eol_chs_len - кол-во байт
 	Возвращает:
 		OK	0
 		ERR	-1
 */
-char init_FileText(FileText * ftext, const unsigned char * eol_chs, unsigned char eol_chs_len);
+char init_teText(teText * ftext, const unsigned char * eol_chs, unsigned char eol_chs_len);
 
 /*
 	Открывает файл path и заполняет структуру ftext
@@ -117,7 +116,7 @@ char init_FileText(FileText * ftext, const unsigned char * eol_chs, unsigned cha
 		OK	0
 		ERR	-1
 */
-char read_from_file_FileText(FileText * ftext, const char * path);
+char read_from_file_teText(teText * ftext, const char * path);
 
 /*
 	Функция записывает строки в файл
@@ -127,7 +126,7 @@ char read_from_file_FileText(FileText * ftext, const char * path);
 		OK	0
 		ERR	-1
 */
-char write_to_file_FileText(FileText * ftext, const char * path);
+char write_to_file_teText(teText * ftext, const char * path);
 
 /*
 	Освобождает память от структур
@@ -135,7 +134,7 @@ char write_to_file_FileText(FileText * ftext, const char * path);
 		OK	0
 		ERR	-1
 */
-char close_file_FileText(FileText * ftext);
+char close_file_teText(teText * ftext);
 
 /*
 	Находит строку по номеру (1 .. кол-во строк)
@@ -143,11 +142,11 @@ char close_file_FileText(FileText * ftext);
 		OK	Указатель на строку
 		ERR	NULL
 */
-Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx);
+teLine * get_line_by_idx_teText(teText * ftext, unsigned int idx);
 
 /*
 	Вставляет группу линий line в позицию pos
-	В FilePos должны быть заполнены:
+	В tePos должны быть заполнены:
 		line
 	Линии встанут перед pos
 	Например:
@@ -158,11 +157,11 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx);
 		OK	0
 		ERR	-1
 */
-char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * line);
+char insert_lines_by_pos_down_teText(teText * ftext, tePos * pos, teLine * line);
 
 /*
 	Вставляет группу линий line в позицию pos
-	В FilePos должны быть заполнены:
+	В tePos должны быть заполнены:
 		line
 	Линии встанут за pos
 	Например:
@@ -173,7 +172,7 @@ char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * l
 		OK	0
 		ERR	-1
 */
-char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * line);
+char insert_lines_by_pos_up_teText(teText * ftext, tePos * pos, teLine * line);
 
 /*
 	Разрезает группу линий в позициях pos
@@ -191,16 +190,16 @@ char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * lin
 		OK	0
 		ERR	-1
 */
-char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos);
+char cut_lines_by_pos_teText(teText * ftext, tePos * pos);
 
 /*
-	Функция заполняет структуру FilePos
+	Функция заполняет структуру tePos
 	Если line == NULL, то ищет строку по ln_idx
 	Возвращает:
 		OK	0
 		ERR	-1
 */
-char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned int ln_idx, bytes_t ch_idx, bytes_t len);
+char fill_pos_teText(teText * ftext, tePos * pos, teLine * line, unsigned int ln_idx, bytes_t ch_idx, bytes_t len);
 
 /*
 	Функция редактирует строки
@@ -224,7 +223,7 @@ char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned in
 	TODO:
 		удалить созданные строки в случае ошибки
 */
-char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned char * data, bytes_t data_len);
+char edit_lines_by_pos_teText(teText * ftext, tePos * pos, const unsigned char * data, bytes_t data_len);
 
 /*
 	Функция копирует байты в буфер
@@ -241,5 +240,5 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 		OK	кол-во записанных символов
 		ERR	-1
 */
-bytes_t get_data_by_pos_FileText(FileText * ftext, FilePos * pos, unsigned char * data, bytes_t data_len);
+bytes_t get_data_by_pos_teText(teText * ftext, tePos * pos, unsigned char * data, bytes_t data_len);
 #endif

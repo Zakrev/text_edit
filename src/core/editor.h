@@ -11,17 +11,18 @@
 
 #include "file.h"
 
-#define File struct main_editor_file
-File {
-	File * next;
-	File * prev;
-	
-	FileText text;
+#define TEXT_EDIT_EDITOR_INIT_TABS_COUNT 100
+
+typedef struct teTab teTab;
+struct teTab {
+	char file_path[256];
+	teText file;
+	tePos pos;
 };
 
-#define Editor struct main_editor_data
-Editor {
-	ListItem * files;
+typedef struct teEditor teEditor;
+struct teEditor {
+	teTab tabs[TEXT_EDIT_EDITOR_INIT_TABS_COUNT];
 };
 
 #endif

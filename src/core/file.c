@@ -6,7 +6,7 @@
 	STATIC FUNCTIONS
 */
 #if DBG_LVL >= 3
-static void pline(Line * line)
+static void pline(teLine * line)
 {
 	bytes_t i;
 	for(i = 0; i < line->len; i++){
@@ -16,7 +16,7 @@ static void pline(Line * line)
 #endif
 
 
-static void pfinf(FileText * ftext, const char * path)
+static void pfinf(teText * ftext, const char * path)
 {
 #if DBG_LVL >= 2
 	if(ftext == NULL)
@@ -27,14 +27,14 @@ static void pfinf(FileText * ftext, const char * path)
 	PRINT("lines: %u\n", ftext->lines_count);
 	PRINT("groups: %hu * %hu\n", ftext->groups_count, ftext->group_size);
 #ifdef DBG_ALLOC_MEM
-	PRINT("alloc mem: %lu + %lu + %lld\n", sizeof(FileText), (unsigned long)sizeof(Line *) * ftext->groups_count,
-		(long long)ftext->alloc_mem - sizeof(Line *) * ftext->groups_count);
+	PRINT("alloc mem: %lu + %lu + %lld\n", sizeof(teText), (unsigned long)sizeof(teLine *) * ftext->groups_count,
+		(long long)ftext->alloc_mem - sizeof(teLine *) * ftext->groups_count);
 #endif
 	PRINT("FILE_INFO\n");
 #endif
 }
 
-static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char eol_chs_len
+static teLine * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef DBG_ALLOC_MEM
 				, bytes_t * alloc
 #endif
@@ -50,11 +50,11 @@ static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char 
 #if DBG_LVL >= 3
 	PFUNC_START();
 #endif
-	Line * line;
+	teLine * line;
 	bytes_t offset = 0;
 	int rc;
 	
-	line = malloc(sizeof(Line));
+	line = malloc(sizeof(teLine));
 	if(line == NULL){
 		PCERR("ptr is NULL");
 		goto err_free_end;
@@ -67,7 +67,7 @@ static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char 
 	
 	line->list_item_type = list_item_type_DEFAULT;
 	line->alloc = sizeof(unsigned char) * MIN_LINE_ALLOC_LENGHT;
-	line->type = main_editor_line_type_LINE;
+	line->type = teLine_type_LINE;
 	line->len = 0;
 
 	while(1){
@@ -112,7 +112,7 @@ static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char 
 	}
 #ifdef DBG_ALLOC_MEM
 	*alloc += line->alloc;
-	*alloc += sizeof(Line);
+	*alloc += sizeof(teLine);
 #endif
 #if DBG_LVL >= 3
 	PRINT("readed line: %lld/%lld: ", (long long)line->len, (long long)line->alloc);
@@ -130,7 +130,7 @@ static Line * read_line_fd(int fd, const unsigned char * eol_chs, unsigned char 
 		return NULL;
 }
 
-static Line * read_line_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
+static teLine * read_line_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef DBG_ALLOC_MEM
 				, bytes_t * alloc
 #endif
@@ -154,10 +154,10 @@ static Line * read_line_str(const unsigned char * data, bytes_t data_len, const 
 		PCERR("unexpected data_len: %lld", (long long)data_len);
 		return NULL;
 	}
-	Line * line;
+	teLine * line;
 	bytes_t offset = 0;
 	
-	line = malloc(sizeof(Line));
+	line = malloc(sizeof(teLine));
 	if(line == NULL){
 		PCERR("ptr is NULL");
 		goto err_free_end;
@@ -170,7 +170,7 @@ static Line * read_line_str(const unsigned char * data, bytes_t data_len, const 
 	
 	line->list_item_type = list_item_type_DEFAULT;
 	line->alloc = sizeof(unsigned char) * MIN_LINE_ALLOC_LENGHT;
-	line->type = main_editor_line_type_LINE;
+	line->type = teLine_type_LINE;
 	line->len = 0;
 
 	while(1){
@@ -210,7 +210,7 @@ static Line * read_line_str(const unsigned char * data, bytes_t data_len, const 
 	}
 #ifdef DBG_ALLOC_MEM
 	*alloc += line->alloc;
-	*alloc += sizeof(Line);
+	*alloc += sizeof(teLine);
 #endif
 #if DBG_LVL >= 3
 	PRINT("readed line: %lld/%lld: ", (long long)line->len, (long long)line->alloc);
@@ -228,7 +228,7 @@ static Line * read_line_str(const unsigned char * data, bytes_t data_len, const 
 		return NULL;
 }
 
-static char create_lines_groups(FileText * ftext)
+static char create_lines_groups(teText * ftext)
 {
 	/*
 		Логически разбивает строки по группам
@@ -262,15 +262,15 @@ static char create_lines_groups(FileText * ftext)
 	if(ftext->group_size != group_old_size || ftext->groups_count != group_old_count){
 		if(ftext->lines_group != NULL){
 #ifdef DBG_ALLOC_MEM
-			ftext->alloc_mem -= sizeof(Line *) * group_old_count;
+			ftext->alloc_mem -= sizeof(teLine *) * group_old_count;
 #endif
-			ftext->lines_group = realloc(ftext->lines_group, sizeof(Line *) * ftext->groups_count);
+			ftext->lines_group = realloc(ftext->lines_group, sizeof(teLine *) * ftext->groups_count);
 			if(ftext->lines_group == NULL){
 				PCERR("ptr is NULL");
 				return -1;
 			}
 #ifdef DBG_ALLOC_MEM
-			ftext->alloc_mem += sizeof(Line *) * ftext->groups_count;
+			ftext->alloc_mem += sizeof(teLine *) * ftext->groups_count;
 #endif
 			if(ftext->group_size != group_old_size){
 				bzero(ftext->lines_group, ftext->groups_count);
@@ -279,14 +279,14 @@ static char create_lines_groups(FileText * ftext)
 				bzero(ftext->lines_group + group_old_count, ftext->groups_count - group_old_count);
 			}
 		} else {
-			ftext->lines_group = malloc(sizeof(Line *) * ftext->groups_count);
+			ftext->lines_group = malloc(sizeof(teLine *) * ftext->groups_count);
 			if(ftext->lines_group == NULL){
 				PCERR("ptr is NULL");
 				return -1;
 			}
 			bzero(ftext->lines_group, ftext->groups_count);
 #ifdef DBG_ALLOC_MEM
-			ftext->alloc_mem += sizeof(Line *) * ftext->groups_count;
+			ftext->alloc_mem += sizeof(teLine *) * ftext->groups_count;
 #endif
 		}
 	}
@@ -294,20 +294,20 @@ static char create_lines_groups(FileText * ftext)
 #ifdef FILEOPT_USE_PTHREADS
 	pthreads!
 #else
-	Line * start;
+	teLine * start;
 	unsigned int ln_idx;
 	unsigned int ln_idx_cur;
 	unsigned char gr_idx = 0;
-	Line * line = NULL;
+	teLine * line = NULL;
 	
-	ftext->lines_group[0] = ftext->lines.next;
+	ftext->lines_group[0] = ftext->open.next;
 	start = ftext->lines_group[0]->next;
 	ln_idx = 2;
 	gr_idx = 1;
 	
 	ln_idx_cur = gr_idx * ftext->group_size + 1;
 	foreach_in_list(line, start){
-		if(line->type != main_editor_line_type_LINE)
+		if(line->type != teLine_type_LINE)
 			continue;
 		if(gr_idx >= ftext->groups_count)
 			break;
@@ -324,14 +324,14 @@ static char create_lines_groups(FileText * ftext)
 	return 0;
 }
 
-static void free_lines_Line(FileText * ftext, Line * lines)
+static void free_lines_teLine(teText * ftext, teLine * lines)
 {
 	/*
 		Освобождает память из под строк
 		Изменяет mem alloc
 	*/
 	PFUNC_START();
-	Line * line, * ltmp;
+	teLine * line, * ltmp;
 	unsigned int count = 0;
 #ifdef DBG_ALLOC_MEM
 	bytes_t free_alloc = 0;
@@ -342,16 +342,16 @@ static void free_lines_Line(FileText * ftext, Line * lines)
 			erase_ListItem((ListItem *)ltmp);
 #ifdef DBG_ALLOC_MEM
 			ftext->alloc_mem -= ltmp->alloc;
-			ftext->alloc_mem -= sizeof(Line);
+			ftext->alloc_mem -= sizeof(teLine);
 			free_alloc += ltmp->alloc;
-			free_alloc += sizeof(Line);
+			free_alloc += sizeof(teLine);
 #endif
 			free(ltmp->data);
 			free(ltmp);
 			ltmp = NULL;
 			count += 1;
 		}
-		if(line->type != main_editor_line_type_LINE)
+		if(line->type != teLine_type_LINE)
 			continue;
 		ltmp = line;
 	}
@@ -359,9 +359,9 @@ static void free_lines_Line(FileText * ftext, Line * lines)
 		erase_ListItem((ListItem *)ltmp);
 #ifdef DBG_ALLOC_MEM
 		ftext->alloc_mem -= ltmp->alloc;
-		ftext->alloc_mem -= sizeof(Line);
+		ftext->alloc_mem -= sizeof(teLine);
 		free_alloc += ltmp->alloc;
-		free_alloc += sizeof(Line);
+		free_alloc += sizeof(teLine);
 #endif
 		free(ltmp->data);
 		free(ltmp);
@@ -376,7 +376,7 @@ static void free_lines_Line(FileText * ftext, Line * lines)
 	PFUNC_END();
 }
 
-static Line * read_lines_path(const char * path, const unsigned char * eol_chs, unsigned char eol_chs_len
+static teLine * read_lines_path(const char * path, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef FILEOPT_USE_PTHREADS
 				, bytes_t write_offset
 				, bytes_t write_len
@@ -408,14 +408,14 @@ static Line * read_lines_path(const char * path, const unsigned char * eol_chs, 
 	}
 	int fd;
 	bytes_t fsize = 0;
-	Line * first_line = NULL;
-	Line * line = NULL;
-	Line end_lines;
+	teLine * first_line = NULL;
+	teLine * line = NULL;
+	teLine end_lines;
 #if DBG_LVL >= 2
 	unsigned int lines_count = 0;
 #endif
 	
-	end_lines.type = main_editor_line_type_LINE_END;
+	end_lines.type = teLine_type_CLOSE;
 	end_lines.list_item_type = list_item_type_NOT_ERASE;
 	end_lines.prev = NULL;
 	end_lines.next = NULL;
@@ -487,12 +487,12 @@ static Line * read_lines_path(const char * path, const unsigned char * eol_chs, 
 	err_free_end:
 		if(end_lines.prev != NULL)
 			end_lines.prev->next = NULL;
-		free_lines_Line(NULL, first_line);
+		free_lines_teLine(NULL, first_line);
 		close(fd);
 		return NULL;
 }
 
-static Line * read_lines_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
+static teLine * read_lines_str(const unsigned char * data, bytes_t data_len, const unsigned char * eol_chs, unsigned char eol_chs_len
 #ifdef DBG_ALLOC_MEM
 				, bytes_t * alloc
 #endif
@@ -522,14 +522,14 @@ static Line * read_lines_str(const unsigned char * data, bytes_t data_len, const
 		return NULL;
 	}
 	bytes_t offset = 0;
-	Line * first_line = NULL;
-	Line * line = NULL;
-	Line end_lines;
+	teLine * first_line = NULL;
+	teLine * line = NULL;
+	teLine end_lines;
 #if DBG_LVL >= 2
 	unsigned int lines_count = 0;
 #endif
 	
-	end_lines.type = main_editor_line_type_LINE_END;
+	end_lines.type = teLine_type_CLOSE;
 	end_lines.list_item_type = list_item_type_NOT_ERASE;
 	end_lines.prev = NULL;
 	end_lines.next = NULL;
@@ -580,11 +580,11 @@ static Line * read_lines_str(const unsigned char * data, bytes_t data_len, const
 	err_free_end:
 		if(end_lines.prev != NULL)
 			end_lines.prev->next = NULL;
-		free_lines_Line(NULL, first_line);
+		free_lines_teLine(NULL, first_line);
 		return NULL;
 }
 
-static void free_groups(FileText * ftext)
+static void free_groups(teText * ftext)
 {
 	/*
 		Освобождает память из под групп (строки не удаляет)
@@ -596,7 +596,7 @@ static void free_groups(FileText * ftext)
 		return;
 	}
 #ifdef DBG_ALLOC_MEM
-	ftext->alloc_mem -= sizeof(Line *) * ftext->groups_count;
+	ftext->alloc_mem -= sizeof(teLine *) * ftext->groups_count;
 #endif
 	ftext->groups_count = 0;
 	ftext->group_size = 0;
@@ -604,7 +604,7 @@ static void free_groups(FileText * ftext)
 	PFUNC_END();
 }
 
-static void free_lines(FileText * ftext)
+static void free_lines(teText * ftext)
 {
 	/*
 		Освобождает память из под строк в структуре
@@ -612,29 +612,29 @@ static void free_lines(FileText * ftext)
 		Изменяет mem alloc
 	*/
 	PFUNC_START();
-	Line * line, * ltmp;
+	teLine * line, * ltmp;
 	unsigned int count = 0;
 #ifdef DBG_ALLOC_MEM
 	bytes_t free_alloc = 0;
 #endif
 	ftext->lines_count = 0;
 	ltmp = NULL;
-	foreach_in_list(line, ftext->lines.next){
+	foreach_in_list(line, ftext->open.next){
 		if(ltmp != NULL){
 			erase_ListItem((ListItem *)ltmp);
 			ftext->esize -= ltmp->len;
 #ifdef DBG_ALLOC_MEM
 			ftext->alloc_mem -= ltmp->alloc;
-			ftext->alloc_mem -= sizeof(Line);
+			ftext->alloc_mem -= sizeof(teLine);
 			free_alloc += ltmp->alloc;
-			free_alloc += sizeof(Line);
+			free_alloc += sizeof(teLine);
 #endif
 			free(ltmp->data);
 			free(ltmp);
 			ltmp = NULL;
 			count += 1;
 		}
-		if(line->type != main_editor_line_type_LINE)
+		if(line->type != teLine_type_LINE)
 			continue;
 		ltmp = line;
 	}
@@ -643,9 +643,9 @@ static void free_lines(FileText * ftext)
 		ftext->esize -= ltmp->len;
 #ifdef DBG_ALLOC_MEM
 		ftext->alloc_mem -= ltmp->alloc;
-		ftext->alloc_mem -= sizeof(Line);
+		ftext->alloc_mem -= sizeof(teLine);
 		free_alloc += ltmp->alloc;
-		free_alloc += sizeof(Line);
+		free_alloc += sizeof(teLine);
 #endif
 		free(ltmp->data);
 		free(ltmp);
@@ -660,7 +660,7 @@ static void free_lines(FileText * ftext)
 	PFUNC_END();
 }
 
-static char edit_Line(Line * line, bytes_t start, bytes_t len, const unsigned char * data, bytes_t data_len
+static char edit_teLine(teLine * line, bytes_t start, bytes_t len, const unsigned char * data, bytes_t data_len
 #ifdef DBG_ALLOC_MEM
 			, bytes_t * alloc
 #endif
@@ -775,7 +775,7 @@ static char edit_Line(Line * line, bytes_t start, bytes_t len, const unsigned ch
 	return 0;
 }
 
-static char erase_from_Line(FileText * ftext, Line * line, bytes_t start, bytes_t len, unsigned char keep_eof)
+static char erase_from_teLine(teText * ftext, teLine * line, bytes_t start, bytes_t len, unsigned char keep_eof)
 {
 	/*
 		Функция вырезает символы из строки
@@ -797,7 +797,7 @@ static char erase_from_Line(FileText * ftext, Line * line, bytes_t start, bytes_
 	}
 	bytes_t old_len = line->len;
 
-	if(0 != edit_Line(line, start, len, ftext->eol_chs, 
+	if(0 != edit_teLine(line, start, len, ftext->eol_chs, 
 			 keep_eof && line->len == (len + start) ? ftext->eol_chs_len : 0
 #ifdef DBG_ALLOC_MEM
 			, &ftext->alloc_mem
@@ -812,7 +812,7 @@ static char erase_from_Line(FileText * ftext, Line * line, bytes_t start, bytes_
 	return 0;
 }
 
-static char add_free_line(FileText * ftext)
+static char add_free_line(teText * ftext)
 {
 	/*
 		Добавляет пустую строку в конец файла, если это необходимо
@@ -827,22 +827,22 @@ static char add_free_line(FileText * ftext)
 		PERR("ptr is NULL");
 		return -1;
 	}
-	Line * line;
+	teLine * line;
 	if(ftext->lines_count == 0){
 		line = read_line_str(NULL, 0, NULL, 0
 #ifdef DBG_ALLOC_MEM
 					, &ftext->alloc_mem
 #endif
 				);
-		if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
+		if(0 == insert_ListItem_offset_down((ListItem *)&ftext->close, (ListItem *)line)){
 			ftext->lines_count += 1;
 			ftext->esize += line->len;
 		}
 		PFUNC_END();
 		return create_lines_groups(ftext);
 	}
-	line = ftext->lines_end.prev;
-	if(line->type != main_editor_line_type_LINE)
+	line = ftext->close.prev;
+	if(line->type != teLine_type_LINE)
 		return 0;
 	if(ftext->eol_chs_len <= line->len)
 		if(0 == memcmp(line->data + (line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
@@ -852,7 +852,7 @@ static char add_free_line(FileText * ftext)
 						, &ftext->alloc_mem
 #endif
 					);
-			if(0 == insert_ListItem_offset_down((ListItem *)&ftext->lines_end, (ListItem *)line)){
+			if(0 == insert_ListItem_offset_down((ListItem *)&ftext->close, (ListItem *)line)){
 				ftext->lines_count += 1;
 				ftext->esize += line->len;
 			}
@@ -863,7 +863,7 @@ static char add_free_line(FileText * ftext)
 	return 0;
 }
 
-static unsigned int write_to_file_path(const char * path, Line * line, bytes_t write_offset, unsigned int write_count)
+static unsigned int write_to_file_path(const char * path, teLine * line, bytes_t write_offset, unsigned int write_count)
 {
 	/*
 		Функция записывает строки в файл
@@ -890,7 +890,7 @@ static unsigned int write_to_file_path(const char * path, Line * line, bytes_t w
 		return write_count;
 	}
 	foreach_in_list(line, line){
-		if(line->type != main_editor_line_type_LINE)
+		if(line->type != teLine_type_LINE)
 			continue;
 		if(write_count <= 0){
 			close(fd);
@@ -920,10 +920,10 @@ static unsigned int write_to_file_path(const char * path, Line * line, bytes_t w
 /*
 	GLOBAL FUNCTIONS
 */
-char init_FileText(FileText * ftext, const unsigned char * eol_chs, unsigned char eol_chs_len)
+char init_teText(teText * ftext, const unsigned char * eol_chs, unsigned char eol_chs_len)
 {
 	/*
-		Инициализирует структуру FileText_init
+		Инициализирует структуру teText_init
 		eol_chs	- байты конца строки
 		eol_chs_len - кол-во байт
 		Возвращает:
@@ -935,13 +935,13 @@ char init_FileText(FileText * ftext, const unsigned char * eol_chs, unsigned cha
 		PERR("ptr is NULL");
 		return -1;
 	}
-	bzero(ftext, sizeof(FileText));
-	ftext->lines.type = main_editor_line_type_LINE_0;
-	ftext->lines.list_item_type = list_item_type_NOT_ERASE;
-	ftext->lines.next = &ftext->lines_end;
-	ftext->lines_end.type = main_editor_line_type_LINE_END;
-	ftext->lines_end.list_item_type = list_item_type_NOT_ERASE;
-	ftext->lines_end.prev = &ftext->lines;
+	bzero(ftext, sizeof(teText));
+	ftext->open.type = teLine_type_OPEN;
+	ftext->open.list_item_type = list_item_type_NOT_ERASE;
+	ftext->open.next = &ftext->close;
+	ftext->close.type = teLine_type_CLOSE;
+	ftext->close.list_item_type = list_item_type_NOT_ERASE;
+	ftext->close.prev = &ftext->open;
 	bzero(ftext->eol_chs, MAX_EOL_CHS_LEN);
 	if(eol_chs_len > MAX_EOL_CHS_LEN)
 		eol_chs_len = MAX_EOL_CHS_LEN;
@@ -954,7 +954,7 @@ char init_FileText(FileText * ftext, const unsigned char * eol_chs, unsigned cha
 	return 0;
 }
 
-char read_from_file_FileText(FileText * ftext, const char * path)
+char read_from_file_teText(teText * ftext, const char * path)
 {
 	/*
 		Открывает файл path и заполняет структуру ftext
@@ -971,8 +971,8 @@ char read_from_file_FileText(FileText * ftext, const char * path)
 		PERR("ptr is NULL");
 		return -1;
 	}
-	Line * file;
-	FilePos pos;
+	teLine * file;
+	tePos pos;
 	
 	pfinf(ftext, path);
 #ifdef FILEOPT_USE_PTHREADS
@@ -986,10 +986,10 @@ char read_from_file_FileText(FileText * ftext, const char * path)
 #endif
 	pos.prev = NULL;
 	pos.next = NULL;
-	pos.line = &ftext->lines_end;
-	if(0 != insert_lines_by_pos_down_FileText(ftext, &pos, file)){
+	pos.line = &ftext->close;
+	if(0 != insert_lines_by_pos_down_teText(ftext, &pos, file)){
 		PERR("fault insert new lines");
-		free_lines_Line(ftext, file);
+		free_lines_teLine(ftext, file);
 		return -1;
 	}
 	if(0 != add_free_line(ftext)){
@@ -1002,7 +1002,7 @@ char read_from_file_FileText(FileText * ftext, const char * path)
 	return 0;
 }
 
-char write_to_file_FileText(FileText * ftext, const char * path)
+char write_to_file_teText(teText * ftext, const char * path)
 {
 	/*
 		Функция записывает строки в файл
@@ -1029,7 +1029,7 @@ char write_to_file_FileText(FileText * ftext, const char * path)
 		PCERR("fault set size of file: %s", path);
 		return -1;
 	}
-	if(0 != write_to_file_path(path, ftext->lines.next, 0, ftext->lines_count)){
+	if(0 != write_to_file_path(path, ftext->open.next, 0, ftext->lines_count)){
 		PERR("failt write data to file");
 		return -1;
 	}
@@ -1039,7 +1039,7 @@ char write_to_file_FileText(FileText * ftext, const char * path)
 	return 0;
 }
 
-char close_file_FileText(FileText * ftext)
+char close_file_teText(teText * ftext)
 {
 	/*
 		Освобождает память от структур
@@ -1062,7 +1062,7 @@ char close_file_FileText(FileText * ftext)
 	return 0;
 }
 
-Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
+teLine * get_line_by_idx_teText(teText * ftext, unsigned int idx)
 {
 	/*
 		Находит строку по номеру (1 .. кол-во строк)
@@ -1076,7 +1076,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
 		return NULL;
 	}
 	
-	Line * line = NULL;
+	teLine * line = NULL;
 	unsigned char gr_idx;
 	unsigned int ln_idx;
 
@@ -1099,7 +1099,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
 		/*От начала группы*/
 		ln_idx = ftext->group_size * (gr_idx - 1) + 1;
 		foreach_in_list(line, ftext->lines_group[gr_idx - 1]){
-			if(line->type != main_editor_line_type_LINE)
+			if(line->type != teLine_type_LINE)
 				continue;
 			if(ln_idx == idx){
 				PFUNC_END();
@@ -1109,10 +1109,10 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
 		}
 	} else {
 		/*От конца группы*/
-		Line * start;
+		teLine * start;
 		if((gr_idx + 1) >= ftext->groups_count){
 			/*Если это последняя группа*/
-			start = ftext->lines_end.prev;
+			start = ftext->close.prev;
 			ln_idx = ftext->lines_count;
 		} else {
 			if(ftext->lines_group[gr_idx] == NULL){
@@ -1123,7 +1123,7 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
 			ln_idx = ftext->group_size * gr_idx;
 		}
 		foreach_in_list_reverse(line, start){
-			if(line->type != main_editor_line_type_LINE)
+			if(line->type != teLine_type_LINE)
 				continue;
 			if(ln_idx == idx){
 				PFUNC_END();
@@ -1139,11 +1139,11 @@ Line * get_line_by_idx_FileText(FileText * ftext, unsigned int idx)
 	return NULL;
 }
 
-char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * line)
+char insert_lines_by_pos_down_teText(teText * ftext, tePos * pos, teLine * line)
 {
 	/*
 		Вставляет группу линий line в позицию pos
-		В FilePos должны быть заполнены:
+		В tePos должны быть заполнены:
 			line
 		Линии встанут перед pos
 		Например:
@@ -1171,7 +1171,7 @@ char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * l
 		PERR("ptr is NULL");
 		return -1;
 	}
-	Line * fe_line, * tmp_line;
+	teLine * fe_line, * tmp_line;
 
 	tmp_line = NULL;
 	foreach_in_list(fe_line, line){
@@ -1199,11 +1199,11 @@ char insert_lines_by_pos_down_FileText(FileText * ftext, FilePos * pos, Line * l
 	return create_lines_groups(ftext);
 }
 
-char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * line)
+char insert_lines_by_pos_up_teText(teText * ftext, tePos * pos, teLine * line)
 {
 	/*
 		Вставляет группу линий line в позицию pos
-		В FilePos должны быть заполнены:
+		В tePos должны быть заполнены:
 			line
 		Линии встанут за pos
 		Например:
@@ -1231,8 +1231,8 @@ char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * lin
 		PERR("ptr is NULL");
 		return -1;
 	}
-	Line * fe_line, * tmp_line;
-	Line * insert_pos = pos->line;
+	teLine * fe_line, * tmp_line;
+	teLine * insert_pos = pos->line;
 	
 	tmp_line = NULL;
 	foreach_in_list(fe_line, line){
@@ -1261,7 +1261,7 @@ char insert_lines_by_pos_up_FileText(FileText * ftext, FilePos * pos, Line * lin
 	return create_lines_groups(ftext);
 }
 
-char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
+char cut_lines_by_pos_teText(teText * ftext, tePos * pos)
 {
 	/*
 		Разрезает группу линий в позициях pos
@@ -1288,24 +1288,24 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 		PERR("ptr is NULL");
 		return -1;
 	}
-	Line * first_line = NULL;
-	Line * new_line = NULL;
-	Line * tmp_line;
-	FilePos * fe_pos;
-	Line new_lines_end;
+	teLine * first_line = NULL;
+	teLine * new_line = NULL;
+	teLine * tmp_line;
+	tePos * fe_pos;
+	teLine new_lines_end;
 	
 	new_lines_end.prev = NULL;
 	new_lines_end.next = NULL;
 	new_lines_end.list_item_type = list_item_type_NOT_ERASE;
-	new_lines_end.type = main_editor_line_type_LINE_END;
+	new_lines_end.type = teLine_type_CLOSE;
 	
-	Line * _cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
+	teLine * _cut_lines_by_pos_teText(teText * ftext, tePos * pos)
 	{
 		if(pos->line == NULL){
 			PERR("ptr is NULL");
 			return NULL;
 		}
-		Line * new_line = NULL;
+		teLine * new_line = NULL;
 		if(pos->line->len > 0){
 			if(pos->ch_idx < 0 || pos->ch_idx > pos->line->len){
 				PERR("unexpected ch_idx: %lld", (long long)pos->ch_idx);
@@ -1316,8 +1316,8 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 							, &ftext->alloc_mem
 #endif
 						);
-			if(0 != erase_from_Line(ftext, pos->line, pos->ch_idx, new_line->len, 1)){
-				free_lines_Line(ftext, new_line);
+			if(0 != erase_from_teLine(ftext, pos->line, pos->ch_idx, new_line->len, 1)){
+				free_lines_teLine(ftext, new_line);
 				return NULL;
 			}
 		} else {
@@ -1332,19 +1332,19 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 	}
 
 	/*Разрезаем первую строку*/
-	first_line = _cut_lines_by_pos_FileText(ftext, pos);
+	first_line = _cut_lines_by_pos_teText(ftext, pos);
 	if(0 != insert_ListItem_offset_down((ListItem *)&new_lines_end, (ListItem *)first_line)){
 		PERR("fault insert item");
-		free_lines_Line(ftext, first_line);
+		free_lines_teLine(ftext, first_line);
 		return -1;
 	}
 
 	foreach_in_list(fe_pos, pos->next){
 		/*Разрезаем остальные строки*/
-		new_line = _cut_lines_by_pos_FileText(ftext, fe_pos);
+		new_line = _cut_lines_by_pos_teText(ftext, fe_pos);
 		if(0 != insert_ListItem_offset_down((ListItem *)&new_lines_end, (ListItem *)new_line)){
 			PERR("fault insert item");
-			free_lines_Line(ftext, first_line);
+			free_lines_teLine(ftext, first_line);
 			return -1;
 		}
 	}
@@ -1358,11 +1358,11 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 			tmp_line = new_line;
 			new_line = new_line->next;
 			if(0 != erase_ListItem((ListItem *)tmp_line)){
-				free_lines_Line(ftext, first_line);
+				free_lines_teLine(ftext, first_line);
 				break;
 			}
 			if(0 != insert_ListItem_offset_up((ListItem *)fe_pos->line, (ListItem *)tmp_line)){
-				free_lines_Line(ftext, first_line);
+				free_lines_teLine(ftext, first_line);
 				break;
 			}
 			ftext->lines_count += 1;
@@ -1372,11 +1372,11 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 	}
 	/*Вставляем первую строку*/
 	if(0 != erase_ListItem((ListItem *)first_line)){
-		free_lines_Line(ftext, first_line);
+		free_lines_teLine(ftext, first_line);
 		return create_lines_groups(ftext);
 	}
 	if(0 != insert_ListItem_offset_up((ListItem *)pos->line, (ListItem *)first_line)){
-		free_lines_Line(ftext, first_line);
+		free_lines_teLine(ftext, first_line);
 		return create_lines_groups(ftext);
 	}
 	ftext->lines_count += 1;
@@ -1386,10 +1386,10 @@ char cut_lines_by_pos_FileText(FileText * ftext, FilePos * pos)
 	return create_lines_groups(ftext);
 }
 
-char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned int ln_idx, bytes_t ch_idx, bytes_t len)
+char fill_pos_teText(teText * ftext, tePos * pos, teLine * line, unsigned int ln_idx, bytes_t ch_idx, bytes_t len)
 {
 	/*
-		Функция заполняет структуру FilePos
+		Функция заполняет структуру tePos
 		Если line == NULL, то ищет строку по ln_idx
 		Возвращает:
 			OK	0
@@ -1410,7 +1410,7 @@ char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned in
 	pos->prev = NULL;
 	
 	if(line == NULL){
-		pos->line = get_line_by_idx_FileText(ftext, ln_idx);
+		pos->line = get_line_by_idx_teText(ftext, ln_idx);
 		if(pos->line == NULL){
 			PERR("line not found: %u", ln_idx);
 			return -1;
@@ -1435,7 +1435,7 @@ char fill_pos_FileText(FileText * ftext, FilePos * pos, Line * line, unsigned in
 	return 0;
 }
 
-char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned char * data, bytes_t data_len)
+char edit_lines_by_pos_teText(teText * ftext, tePos * pos, const unsigned char * data, bytes_t data_len)
 {
 	/*
 		Функция редактирует строки
@@ -1477,14 +1477,14 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 		return -1;
 	}
 	
-	Line * new_lines = NULL;
-	Line * erase_line;
-	Line * tmp_line;
-	Line * last_line = NULL;
-	Line erases_lines_end;
+	teLine * new_lines = NULL;
+	teLine * erase_line;
+	teLine * tmp_line;
+	teLine * last_line = NULL;
+	teLine erases_lines_end;
 	bytes_t last_len;
 	
-	erases_lines_end.type = main_editor_line_type_LINE_END;
+	erases_lines_end.type = teLine_type_CLOSE;
 	erases_lines_end.next = NULL;
 	erases_lines_end.prev = NULL;
 	if(pos->len > 0){
@@ -1532,26 +1532,26 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 					if(erase_line->prev == NULL)
 						break;
 				}
-				free_lines_Line(ftext, erase_line);
+				free_lines_teLine(ftext, erase_line);
 			}
 			
-			if(0 != erase_from_Line(ftext, pos->line, pos->ch_idx, pos->line->len - pos->ch_idx, 0))
+			if(0 != erase_from_teLine(ftext, pos->line, pos->ch_idx, pos->line->len - pos->ch_idx, 0))
 				return -1;
-			if(0 != erase_from_Line(ftext, last_line, 0, last_len, 0))
+			if(0 != erase_from_teLine(ftext, last_line, 0, last_len, 0))
 				return -1;
 		} else {
 			/*Удаляемые данные НЕ выходят за строку в pos*/
-			if(0 != erase_from_Line(ftext, pos->line, pos->ch_idx, pos->len, 0))
+			if(0 != erase_from_teLine(ftext, pos->line, pos->ch_idx, pos->len, 0))
 				return -1;
 			/*Делим первую строку на две*/
-			if(0 != cut_lines_by_pos_FileText(ftext, pos)){
+			if(0 != cut_lines_by_pos_teText(ftext, pos)){
 				PERR("fault cut line");
 				return -1;
 			}
 			if(ftext->eol_chs_len <= pos->line->len)
 				if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
 					/*Вырезаем символ eol*/
-					if(0 != erase_from_Line(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
+					if(0 != erase_from_teLine(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
 						return -1;
 				}
 			last_line = pos->line->next;
@@ -1560,14 +1560,14 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 	if(last_line == NULL){
 		/*Скорей-всего происходит вставка данных без удаления*/
 		/*Делим первую строку на две*/
-		if(0 != cut_lines_by_pos_FileText(ftext, pos)){
+		if(0 != cut_lines_by_pos_teText(ftext, pos)){
 			PERR("fault cut line");
 			return -1;
 		}
 		if(ftext->eol_chs_len <= pos->line->len)
 			if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
 				/*Вырезаем символ eol*/
-				if(0 != erase_from_Line(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
+				if(0 != erase_from_teLine(ftext, pos->line, pos->line->len - ftext->eol_chs_len, ftext->eol_chs_len, 0))
 					return -1;
 			}
 		last_line = pos->line->next;
@@ -1612,7 +1612,7 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 	}
 	if(new_lines != NULL){
 		/*Склеиваем строки после вставки новых данных*/
-		if(0 != edit_Line(pos->line, pos->ch_idx, 0, new_lines->data, new_lines->len
+		if(0 != edit_teLine(pos->line, pos->ch_idx, 0, new_lines->data, new_lines->len
 #ifdef DBG_ALLOC_MEM
 					, &ftext->alloc_mem
 #endif
@@ -1624,7 +1624,7 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 		tmp_line = new_lines->next;
 		if(tmp_line == NULL){
 			/*Была вставлена только одна строка*/
-			if(last_line->len == 0 && last_line->next->type	== main_editor_line_type_LINE){
+			if(last_line->len == 0 && last_line->next->type	== teLine_type_LINE){
 				erase_ListItem((ListItem *)last_line);
 				insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
 				ftext->lines_count -= 1;
@@ -1634,13 +1634,13 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			if(ftext->eol_chs_len <= pos->line->len)
 				if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
 					/*Строка pos->line имеет символ eol*/
-					free_lines_Line(ftext, new_lines);
+					free_lines_teLine(ftext, new_lines);
 					
 					PFUNC_END();
 					return create_lines_groups(ftext);
 				}
 			
-			if(0 != edit_Line(pos->line, pos->line->len, 0, last_line->data, last_line->len
+			if(0 != edit_teLine(pos->line, pos->line->len, 0, last_line->data, last_line->len
 #ifdef DBG_ALLOC_MEM
 						, &ftext->alloc_mem
 #endif
@@ -1652,7 +1652,7 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
 			
 			ftext->lines_count -= 1;
-			free_lines_Line(ftext, new_lines);
+			free_lines_teLine(ftext, new_lines);
 		} else {
 			/*Было вставлено больше одной строки*/
 			erase_ListItem((ListItem *)tmp_line);
@@ -1660,7 +1660,7 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			ftext->esize += tmp_line->len;
 			ftext->lines_count += 1;
 			
-			if(last_line->len == 0 && last_line->next->type == main_editor_line_type_LINE){
+			if(last_line->len == 0 && last_line->next->type == teLine_type_LINE){
 				erase_ListItem((ListItem *)last_line);
 				insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
 				ftext->lines_count -= 1;
@@ -1670,13 +1670,13 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			if(ftext->eol_chs_len <= tmp_line->len)
 				if(0 == memcmp(tmp_line->data + (tmp_line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
 					/*Строка tmp_line имеет символ eol*/
-					free_lines_Line(ftext, new_lines);
+					free_lines_teLine(ftext, new_lines);
 					
 					PFUNC_END();
 					return create_lines_groups(ftext);
 				}
 
-			if(0 != edit_Line(tmp_line, tmp_line->len, 0, last_line->data, last_line->len
+			if(0 != edit_teLine(tmp_line, tmp_line->len, 0, last_line->data, last_line->len
 #ifdef DBG_ALLOC_MEM
 						, &ftext->alloc_mem
 #endif
@@ -1689,11 +1689,11 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			insert_ListItem_offset_up((ListItem *)new_lines, (ListItem *)last_line);
 			
 			ftext->lines_count -= 1;
-			free_lines_Line(ftext, new_lines);
+			free_lines_teLine(ftext, new_lines);
 		}
 	} else {
 		/*Склеиваем строки после удаления данных*/
-		if(last_line->len == 0 && last_line->next->type == main_editor_line_type_LINE){
+		if(last_line->len == 0 && last_line->next->type == teLine_type_LINE){
 			erase_ListItem((ListItem *)last_line);
 			new_lines = last_line;
 			ftext->lines_count -= 1;
@@ -1703,13 +1703,13 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 		if(ftext->eol_chs_len <= pos->line->len)
 			if(0 == memcmp(pos->line->data + (pos->line->len - ftext->eol_chs_len), ftext->eol_chs, ftext->eol_chs_len)){
 				/*Строка pos->line имеет символ eol*/
-				free_lines_Line(ftext, new_lines);
+				free_lines_teLine(ftext, new_lines);
 				
 				PFUNC_END();
 				return create_lines_groups(ftext);
 			}
 		
-		if(0 != edit_Line(pos->line, pos->line->len, 0, last_line->data, last_line->len
+		if(0 != edit_teLine(pos->line, pos->line->len, 0, last_line->data, last_line->len
 #ifdef DBG_ALLOC_MEM
 					, &ftext->alloc_mem
 #endif
@@ -1724,18 +1724,18 @@ char edit_lines_by_pos_FileText(FileText * ftext, FilePos * pos, const unsigned 
 			new_lines = last_line;
 		
 		ftext->lines_count -= 1;
-		free_lines_Line(ftext, new_lines);
+		free_lines_teLine(ftext, new_lines);
 	}
 	
 	PFUNC_END();
 	return create_lines_groups(ftext);
 	
 	err_free_end:
-		free_lines_Line(ftext, new_lines);
+		free_lines_teLine(ftext, new_lines);
 		return -1;
 }
 
-bytes_t get_data_by_pos_FileText(FileText * ftext, FilePos * pos, unsigned char * data, bytes_t data_len)
+bytes_t get_data_by_pos_teText(teText * ftext, tePos * pos, unsigned char * data, bytes_t data_len)
 {
 	/*
 		Функция копирует байты в буфер
@@ -1769,12 +1769,12 @@ bytes_t get_data_by_pos_FileText(FileText * ftext, FilePos * pos, unsigned char 
 		PERR("unexpexted 'data_len': %lld", (long long)data_len);
 		return -1;
 	}
-	Line * line;
+	teLine * line;
 	bytes_t writed = 0;
 	bytes_t offset = 0;
 	
 	foreach_in_list(line, pos->line){
-		if(line->type != main_editor_line_type_LINE)
+		if(line->type != teLine_type_LINE)
 			break;
 		if(offset >= data_len || writed >= pos->len)
 			return writed;
