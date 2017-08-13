@@ -47,11 +47,11 @@ static double __time_exec_wtime__()
 	return (double)t.tv_sec + (double)t.tv_usec * 1E-6;
 }
 #define PFUNC_START()\
-		fprintf(DBG_STDOUT, "SF: %s\n", __FUNCTION__); fflush(DBG_STDOUT);\
+		fprintf(DBG_STDOUT, "START: %s\n", __FUNCTION__); fflush(DBG_STDOUT);\
 		double __time_exec_function__ = __time_exec_wtime__()
 		
 #define PFUNC_END()\
-		fprintf(DBG_STDOUT, "SE: %s: %f sec\n", __FUNCTION__, __time_exec_wtime__() - __time_exec_function__); fflush(DBG_STDOUT)
+		fprintf(DBG_STDOUT, "SUCESS: %s: %f sec\n", __FUNCTION__, __time_exec_wtime__() - __time_exec_function__); fflush(DBG_STDOUT)
 #else
 #define PINF(...)
 #define PRINT(...)

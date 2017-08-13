@@ -79,7 +79,7 @@ static void set_win_caption_terminal(char * str, bytes_t len)
 	PFUNC_END();
 }
 
-static int parse_input_terminal(char byte)
+static int parse_input_terminal(teView * view, char byte)
 {
 	/*
 		Парсит ввод терминала
@@ -112,8 +112,10 @@ static int parse_input_terminal(char byte)
 			break;
 		case 0x3: //CTRL + C
 		case 0x1a: //CTRL + Z
+			view->cmd = te_terminal_cmd_type_EXIT;
 			return 1;
 			break;
+		case 0x7f: //BACKSPACE
 		case 0xa: //ENTER
 		default:
 			switch(get_utf8_letter_size(byte)){
@@ -311,12 +313,11 @@ static letter_t print_long_line_pos_terminal(teView * view, const unsigned x, co
 	return len;
 }
 
-static int print_view_1_header_terminal(teView * view)
+static int print_view_EDIT_FILE_header_line_2_terminal(teView * view)
 {
 	/*
 		Печатает часть окна вида:
 
-		(Имя файла)		(Menu: ALT + M)
 		(Расположение файла)	  (rwx/rwx/rwx)
 	*/
 	PFUNC_START();
@@ -364,7 +365,84 @@ static int print_view_1_header_terminal(teView * view)
 	return 0;
 }
 
-static int print_view_1_terminal(teView * view)
+static int print_view_EDIT_FILE_header_line_1_terminal(teView * view, unsigned char info)
+{
+	/*
+		Печатает часть окна вида:
+
+		(Имя файла)		(UPDATE: ALT + U)(EDIT_ON: ALI + E)(Save: ALT + S)(Menu: ALT + M)
+	*/
+	PFUNC_START();
+	letter_t part_len = 0;
+	letter_t ret = 0;
+	char arights[14] = "(---/---/---)";
+
+	/*Находится в view*/
+	letter_t fname_len;
+	char * file_name = "Печатает часть окна видаПечатает часть окна видаПечатает часть окна видаПечатает часть окна видаПечатает часть окна вида";
+	letter_t path_len;
+	char * path_name = "Печатает часть окна видаПечатает часть окна видаПечатает часть окна видаПечатает часть окна видаПечатает часть окна вида";
+	fname_len = get_utf8_strlen(file_name, NULL);
+	path_len = get_utf8_strlen(path_name, NULL);
+	/*Находится в view*/
+
+	/*Подсказки*/
+	if(info & TEINF_MENU){
+		part_len = get_utf8_strlen(TE_TERMINAL_INF_MENU, NULL);
+		if(view->x_max < part_len)
+			return 0;
+		ret += print_line_pos_terminal(view, (unsigned int)(view->x_max - part_len + 1), 1,
+				TE_TERMINAL_INF_MENU, 
+				part_len,
+				TE_TERMINAL_VIEW_EDIT_FILE_HEADER_LETTER_COLOR);
+		if(ret <= 0){
+			PERR("fault write");
+			return -1;
+		}
+	}
+	if(info & TEINF_SAVE){
+		part_len = get_utf8_strlen(TE_TERMINAL_INF_SAVE, NULL);
+		if(view->x_max < part_len + ret)
+			return 0;
+		ret += print_line_pos_terminal(view, (unsigned int)(view->x_max - part_len + 1), 1,
+				TE_TERMINAL_INF_SAVE, 
+				part_len,
+				TE_TERMINAL_VIEW_EDIT_FILE_HEADER_INF_SAVE);
+		if(ret <= 0){
+			PERR("fault write");
+			return -1;
+		}
+	}
+
+	/*Заголовок*/
+	set_win_caption_terminal(file_name, fname_len);
+	ret = print_long_line_pos_terminal(view, 1, 1, file_name, fname_len, view->x_max - part_len, NULL);
+	if(ret <= 0){
+		PERR("fault write");
+		return -1;
+	}
+	
+
+	/*Расположение файла*/
+	ret = print_long_line_pos_terminal(view, 1, 2, path_name, path_len, view->x_max - strlen(arights), TE_TERMINAL_VIEW_EDIT_FILE_HEADER_LETTER_COLOR);
+	if(ret <= 0){
+		PERR("fault write");
+		return -1;
+	}
+
+	/*Права доступа
+		TODO: цвет в зависимоти от прав доступа TE_TERMINAL_ACCESS_RIGHTS либо TE_TERMINAL_VIEW_1_HEADER_LETTER_COLOR*/
+	ret = print_line_pos_terminal(view, (unsigned int)(view->x_max - strlen(arights) + 1), 2, arights, strlen(arights), TE_TERMINAL_ACCESS_RIGHTS_RDONLY);
+	if(ret <= 0){
+		PERR("fault write");
+		return -1;
+	}
+
+	PFUNC_END();
+	return 0;
+}
+
+static int print_view_EDIT_FILE_terminal(teView * view)
 {
 	/*
 		Печатает окно редактора
@@ -374,9 +452,21 @@ static int print_view_1_terminal(teView * view)
 		return -1;
 	}
 	
-	if(0 != print_view_1_header_terminal(view))
+	set_pos_terminal(0, 0);
+	if(0 != print_view_EDIT_FILE_header_terminal(view))
 		return -1;
 	
+	while(1){
+		/*Обработка ввода*/
+		int rd;
+		char byte;
+		rd = read(0, &byte, 1);
+		if(rd > 0){
+			if(0 != parse_input_terminal(view, byte))
+				break;
+		}
+	}
+
 	return 0;
 }
 
@@ -395,6 +485,7 @@ int init_view_terminal(teView * view)
 		PERR("ptr is NULL");
 		return -1;
 	}
+	bzero(view, sizeof(teView));
 
 	if(0 != tcgetattr(0, &view->tbackup)){
 		return 1;
@@ -419,10 +510,6 @@ int init_view_terminal(teView * view)
 		py -= 1;
 		write(1, "\x1b""D", strlen("\x1b""D"));
 	}
-	set_pos_terminal(0, 0);
-	/*Первая отрисовка интерфейса*/
-	if(0 != print_view_1_terminal(view))
-		return -1;
 
 	PFUNC_END();
 	return 0;
@@ -438,7 +525,7 @@ int close_view_terminal(teView * view)
 		PERR("ptr is NULL");
 		return -1;
 	}
-	
+	set_win_caption_terminal(" ", 1);
 	set_pos_terminal(0, 0);
 	clear_terminal();
 
@@ -452,7 +539,7 @@ int close_view_terminal(teView * view)
 	return 0;
 }
 
-int run_editor_terminal(teView * view)
+int run_editor_terminal(teView * view, int names_count, char ** names)
 {
 	/*
 		Запуск редактора
@@ -462,16 +549,18 @@ int run_editor_terminal(teView * view)
 		PERR("ptr is NULL");
 		return -1;
 	}
-
 	while(1){
-		int rd;
-		char byte;
-		rd = read(0, &byte, 1);
-		if(rd > 0){
-			if(0 != parse_input_terminal(byte))
+		switch(view->cmd){
+			case te_terminal_cmd_type_EDIT_FILE:
+				if(0 != print_view_EDIT_FILE_terminal(view))
+					return -1;
 				break;
+			case te_terminal_cmd_type_EXIT:
+				PFUNC_END();
+				return 0;
+			default:
+				PERR("unexpected view type");
 		}
 	}
-	PFUNC_END();
-	return 0;
+	return -1;
 }
