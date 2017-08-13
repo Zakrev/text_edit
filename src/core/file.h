@@ -1,5 +1,5 @@
-#ifndef _FILE_H_
-#define _FILE_H_
+#ifndef _TE_FILE_H_
+#define _TE_FILE_H_
 
 /*
 	Модуль 'file'
