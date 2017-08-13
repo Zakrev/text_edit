@@ -40,4 +40,13 @@ int close_view_terminal(teView * view);
 */
 int run_editor_terminal(teView * view);
 
+/*Символы*/
+#define TE_TERMINAL_BOARD_HORIZONTAL "-"
+#define TE_TERMINAL_BOARD_VERTICAL "|"
+/*Цвета*/
+#define TE_TERMINAL_DEFAULT_LETTER_COLOR "\x1b[40;37m"
+#define TE_TERMINAL_VIEW_1_HEADER_LETTER_COLOR "\x1b[45;37m"
+/*Текст*/
+#define TE_TERMINAL_MENU_OPEN "(Menu: ALT + M)"
+
 #endif

@@ -62,19 +62,20 @@ static void set_win_caption_terminal(char * str, ssize_t len)
 		Устанавливает заголовок окна терминала (эмулятора)
 	*/
 	PFUNC_START();
-	char buff[512];
-	ssize_t buff_len;
-	ssize_t prefix = strlen("\x1b]2;");
-	ssize_t postfix = strlen("\x07");
+	char buff[256];
+	ssize_t offset = 0;
 
-	memcpy(buff, "\x1b]2;", prefix);
-	if(len > (512 - (prefix + postfix))){
-		buff_len = len - (512 - (prefix + postfix)) - 3;
-		memcpy(buff, str, buff_len);
-		memcpy(buff, "...", 3);
-		buff_len = buff_len + prefix + postfix + 3;
+	offset = sprintf(buff, "\x1b]2;");
+	if(len > (256 - (offset + strlen("\x07")))){
+		len = len - (len - (256 - (offset + strlen("\x07") + strlen("..."))));
+		str[len] = '\0';
+		offset += sprintf(buff + offset, "%s...", str);
+	} else {
+		offset += sprintf(buff + offset, "%s", str);
 	}
-	write(1, buff, buff_len);
+	offset += sprintf(buff + offset, "\x07");
+
+	write(1, buff, offset);
 	PFUNC_END();
 }
 
@@ -105,14 +106,8 @@ static int parse_input_terminal(char byte)
 							break;
 						case 0x41: //UP
 							break;
-						default:
-							PERR("undefined symbol for escape-sequence");
-							return -1;
 					}
 					break;
-				default:
-					PERR("undefined symbol for escape-sequence");
-					return -1;
 			}
 			break;
 		case 0x3: //CTRL + C
@@ -159,7 +154,6 @@ static int parse_input_terminal(char byte)
 			}
 			break;
 	}
-
 	PFUNC_END();
 	return 0;
 }
@@ -191,6 +185,44 @@ static void close_DBG_file()
 		fclose(te_stdout);
 }
 #endif
+
+static int print_view_1_header_terminal(teView * view)
+{
+	/*
+		Печатает часть окна вида:
+
+		(Имя файла)		(Menu: ALT + M)
+		---------------------------------------
+	*/
+	PFUNC_START();
+	if(view == NULL){
+		PERR("ptr is NULL");
+		return -1;
+	}
+
+	ssize_t part_len = strlen(TE_TERMINAL_MENU_OPEN);
+	ssize_t fname_len;
+	char * file_name = "Hello world!Hello world!Hello world!Hello world!Hello world!Hello world!Hello world!Hello world!Hello world!";
+
+	fname_len = strlen(file_name);
+	set_win_caption_terminal(file_name, fname_len);
+	if(fname_len > (view->x_max - part_len - 3 - 2)){
+		fname_len = fname_len - (fname_len - (view->x_max - part_len - 3 - 2));
+		set_pos_terminal((unsigned int)(view->x_max - part_len - 3 + 1), 1);
+		write(1, "...)", 3);
+	} else {
+		set_pos_terminal((unsigned int)(view->x_max - part_len ), 1);
+		write(1, ")", 1);
+	}
+	set_pos_terminal((unsigned int)(view->x_max - part_len + 1), 1);
+	write(1, TE_TERMINAL_MENU_OPEN, part_len);
+	set_pos_terminal(1, 1);
+	write(1, "(", 1);
+	write(1, file_name, fname_len);
+
+	PFUNC_END();
+	return 0;
+}
 
 int init_view_terminal(teView * view)
 {
@@ -233,7 +265,7 @@ int init_view_terminal(teView * view)
 	}
 	set_pos_terminal(0, 0);
 	/*Первая отрисовка интерфейса*/
-	
+	print_view_1_header_terminal(view);
 
 	PFUNC_END();
 	return 0;
