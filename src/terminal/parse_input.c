@@ -58,7 +58,7 @@ static int parse_input(char byte)
 	peol();
 	pparse(byte);
 	switch(byte){
-		case 0x1b: //esc
+		case 0x1b: //esc ~ ALT
 			if(0 >= read(0, &byte, 1))
 				return -1;
 			pparse(byte);
@@ -77,6 +77,20 @@ static int parse_input(char byte)
 						case 0x41: //UP
 							break;
 					}
+					break;
+				case 0x6d: //ALT + m
+					break;
+				case 0x63: //ALT + c
+					break;
+				case 0x76: //ALT + v
+					break;
+				case 0x73: //ALT + s
+					break;
+				case 0x78: //ALT + x
+					break;
+				case 0x61: //ALT + a
+					break;
+				case 0x71: //ALT + q
 					break;
 			}
 			break;

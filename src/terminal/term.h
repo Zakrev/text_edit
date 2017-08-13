@@ -13,6 +13,9 @@
 //#include "../core/file.h"
 #include "../encoding/utf_8.h"
 
+typedef ssize_t bytes_t;
+typedef ssize_t letter_t;
+
 #define TE_DBG_FILE_NAME "te_terminal_debug.txt"
 
 typedef struct teView teView;
@@ -40,13 +43,24 @@ int close_view_terminal(teView * view);
 */
 int run_editor_terminal(teView * view);
 
+/*
+	Параметры вывода
+*/
+#define TE_TERMINAL_SET_FORMAT(format)\
+		write(1, format, strlen(format))
+#define FORMAT(format) \
+		TE_TERMINAL_SET_FORMAT(format)
+
 /*Символы*/
-#define TE_TERMINAL_BOARD_HORIZONTAL "-"
-#define TE_TERMINAL_BOARD_VERTICAL "|"
+#define TE_TERMINAL_BOARD_HORIZONTAL '-'
+#define TE_TERMINAL_BOARD_VERTICAL '|'
+#define TE_TERMINAL_VOID ' '
 /*Цвета*/
-#define TE_TERMINAL_DEFAULT_LETTER_COLOR "\x1b[40;37m"
-#define TE_TERMINAL_VIEW_1_HEADER_LETTER_COLOR "\x1b[45;37m"
+#define TE_TERMINAL_DEFAULT_FORMAT "\x1b[0m"
+#define TE_TERMINAL_VIEW_1_HEADER_LETTER_COLOR "\x1b[1m\x1b[44;37m"
+#define TE_TERMINAL_ACCESS_RIGHTS_RDONLY "\x1b[1m\x1b[41;37m"
+#define TE_TERMINAL_ACCESS_RIGHTS_EXE "\x1b[1m\x1b[42;37m"
 /*Текст*/
-#define TE_TERMINAL_MENU_OPEN "(Menu: ALT + M)"
+#define TE_TERMINAL_MENU_OPEN "(Меню: ALT + M)"
 
 #endif
