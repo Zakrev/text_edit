@@ -12,7 +12,7 @@
 #include "file.h"
 #include "listitem.h"
 
-#define TEXT_EDIT_EDITOR_INIT_TABS_COUNT 100
+#define TEXT_EDIT_EDITOR_INIT_TABS_COUNT 20
 
 /*
 	Тип, в котором будут храниться данные связанные с длинной символов
@@ -20,58 +20,11 @@
 */
 typedef ssize_t letter_t;
 
-enum tePrintOptColor_type {
-	tePrintOptColor_type_HEX,
-	tePrintOptColor_type_RGB
-};
-
-typedef struct tePrintOptColor tePrintOptColor;
-typedef struct tePrintOptColor {
-	int type;
-	int color;
-};
-
-typedef struct tePrintOpt tePrintOpt;
-typedef struct tePrintOpt {
-	tePrintOptColor c_background;
-	tePrintOptColor c_letter;
-};
-
-typedef struct tePrintMapPos tePrintMapPos;
-typedef struct tePrintMapPos {
-	/*ListItem*/
-	tePrintMapPos * next;
-	tePrintMapPos * prev;
-	unsigned char list_item_type;
-	
-	/*Позиция*/
-	teLine * line;
-	bytes_t ch_idx;
-
-	/*Параметры*/
-	tePrintOpt opt;
-};
-
-typedef struct tePrintMap tePrintMap;
-struct tePrintMap {
-	/*
-		Параметры текста для вывода.
-		Цвет, стиль, размер и т.д.
-	*/
-
-	/*Скомпилированные парсером*/
-	tePrintMapPos * opt;
-
-	/*Дефолтные*/
-	tePrintMapPos default_opt;
-};
-
 typedef struct teTab teTab;
 struct teTab {
 	char file_path[256];
 	teText file;
 	tePos pos;
-	tePrintMap map;
 };
 
 typedef struct teEditor teEditor;

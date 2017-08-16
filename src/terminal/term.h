@@ -95,17 +95,53 @@ int run_editor_terminal(teView * view, int names_count, char ** names);
 #define TE_TERMINAL_VOID ' '
 
 /*Цвета*/
-#define TE_TERMINAL_DEFAULT_FORMAT "\x1b[0m"
-#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_LETTER_COLOR "\x1b[1m\x1b[44;37m"
-#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_INF_SAVE "\x1b[1m\x1b[42;37m"
-#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_INF_UPDATE "\x1b[1m\x1b[43;37m"
-#define TE_TERMINAL_ACCESS_RIGHTS_RDONLY "\x1b[1m\x1b[41;37m"
-#define TE_TERMINAL_ACCESS_RIGHTS_EXE "\x1b[1m\x1b[42;37m"
+#define TCT_BLACK "30"
+#define TCT_RED "31"
+#define TCT_GREEN "32"
+#define TCT_BROWN "33"
+#define TCT_BLUE "34"
+#define TCT_LILAC "35"
+#define TCT_LIGHT_BLUE "36"
+#define TCT_WHITE "37"
+#define TCTB_BLACK "40"
+#define TCTB_RED "41"
+#define TCTB_GREEN "42"
+#define TCTB_BROWN "43"
+#define TCTB_BLUE "44"
+#define TCTB_LILAC "45"
+#define TCTB_LIGHT_BLUE "46"
+#define TCTB_WHITE "47"
+
+#define TE_TERMINAL_F_DEFAULT 			"\x1b[0m"
+#define TE_TERMINAL_F_BOLD 			"\x1b[1m"
+#define TE_TERMINAL_F_UNDERSCORE 		"\x1b[4m"
+#define TE_TERMINAL_F_COLOR(back, color)	("\x1b["back";"color"m")
+
+
+#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_LETTER_COLOR\
+			TE_TERMINAL_F_BOLD\
+			TE_TERMINAL_F_COLOR(TCTB_BLUE, TCT_WHITE)
+
+#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_INF_SAVE\
+			TE_TERMINAL_F_BOLD\
+			TE_TERMINAL_F_COLOR(TCTB_GREEN, TCT_WHITE)
+
+#define TE_TERMINAL_VIEW_EDIT_FILE_HEADER_INF_UPDATE\
+			TE_TERMINAL_F_BOLD\
+			TE_TERMINAL_F_COLOR(TCTB_BROWN, TCT_WHITE)
+
+#define TE_TERMINAL_ACCESS_RIGHTS_RDONLY\
+			TE_TERMINAL_F_BOLD\
+			TE_TERMINAL_F_COLOR(TCTB_RED, TCT_WHITE)
+
+#define TE_TERMINAL_ACCESS_RIGHTS_EXE\
+			TE_TERMINAL_F_BOLD\
+			TE_TERMINAL_F_COLOR(TCTB_GREEN, TCT_WHITE)
 
 /*Текст*/
-#define TE_TERMINAL_INF_MENU "(Меню: ALT + M)"
-#define TE_TERMINAL_INF_SAVE "(Записать: ALT + W)"
-#define TE_TERMINAL_INF_EDIT "(Изменить: ALT + E)"
-#define TE_TERMINAL_INF_UPDATE "(Обновить: ALT + U)"
+#define TE_TERMINAL_INF_MENU	"(Меню: ALT + M)"
+#define TE_TERMINAL_INF_SAVE	"(Записать: ALT + W)"
+#define TE_TERMINAL_INF_EDIT	"(Изменить: ALT + E)"
+#define TE_TERMINAL_INF_UPDATE	"(Обновить: ALT + U)"
 
 #endif

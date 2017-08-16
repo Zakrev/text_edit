@@ -10,6 +10,77 @@ static FILE * te_stdout = NULL;
 #include "../debug.h"
 #include "term.h"
 
+static char convert_RGB_to_terminal_static(unsigned char R, unsigned char G, unsigned char B, unsigned char is_back)
+{
+	/*
+		Конвертирует цвет RGB в терминальный
+	*/
+	static char black[3] = TCT_BLACK;
+	static char red[3] = TCT_RED;
+	static char green[3] = TCT_GREEN;
+	static char brown[3] = TCT_BROWN;
+	static char blue[3] = TCT_BLUE;
+	static char lilac[3] = TCT_LILAC;
+	static char light_blue[3] = TCT_LIGHT_BLUE;
+	static char white[3] = TCT_WHITE;
+
+	static char bblack[3] = TCTB_BLACK;
+	static char bred[3] = TCTB_RED;
+	static char bgreen[3] = TCTB_GREEN;
+	static char bbrown[3] = TCTB_BROWN;
+	static char bblue[3] = TCTB_BLUE;
+	static char blilac[3] = TCTB_LILAC;
+	static char blight_blue[3] = TCTB_LIGHT_BLUE;
+	static char bwhite[3] = TCTB_WHITE;
+
+	if(!is_back){
+		if(R == G == B == 0)
+			return black;
+		if(R == G == B)
+			return white;
+		if(G == B == 0)
+			return red;
+		if(R == B == 0)
+			return green;
+		if(R == G == 0)
+			return blue;
+
+		if(R >= 128 && G > 0 && B <= 128)
+			return brown;
+		if(R == G == 255 && B <= 128)
+			return brown;
+
+		if(R >= 128 && G <= 128 && B >= 128)
+			return lilac;
+		if(R == B == 255)
+			return lilac;
+
+		return light_blue;
+	}
+	if(R == G == B == 0)
+		return bblack;
+	if(R == G == B)
+		return bwhite;
+	if(G == B == 0)
+		return bred;
+	if(R == B == 0)
+		return bgreen;
+	if(R == G == 0)
+		return bblue;
+
+	if(R >= 128 && G > 0 && B <= 128)
+		return bbrown;
+	if(R == G == 255 && B <= 128)
+		return bbrown;
+
+	if(R >= 128 && G <= 128 && B >= 128)
+		return blilac;
+	if(R == B == 255)
+		return blilac;
+
+	return blight_blue;
+}
+
 static void set_pos_terminal(unsigned int x, unsigned int y)
 {
 	/*
